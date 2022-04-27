@@ -1,0 +1,8 @@
+#ifndef CONFIG_H_IN
+#define CONFIG_H_IN
+ 
+#define VERSION_SHIELD @VERSION_SHIELD@
+#define VERSION_MCPL @VERSION_MCPL@
+#define CRY_BUILD @CRY_BUILD@
+
+#endif // CONFIG_H_IN
