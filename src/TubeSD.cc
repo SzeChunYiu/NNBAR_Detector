@@ -77,6 +77,10 @@ void TubeSD::Initialize(G4HCofThisEvent*)
 //.....
 G4bool TubeSD::ProcessHits(G4Step* aStep, G4TouchableHistory* )
 {
+
+    if (aStep->IsFirstStepInVolume() && (aStep->IsLastStepInVolume())){}
+    else{return false;}
+
     G4Track * theTrack = aStep  ->  GetTrack();
    
     G4ThreeVector stepDelta = aStep->GetDeltaPosition();
@@ -146,9 +150,14 @@ G4bool TubeSD::ProcessHits(G4Step* aStep, G4TouchableHistory* )
     // Get the step average kinetic energy
     G4double eKinMean = (eKinPre + eKinPost) * 0.5;
 
+    G4String current_vol = aStep->GetPreStepPoint()->GetTouchable()->GetVolume()->GetName();
+    G4String origin_vol = theTrack->GetOriginTouchable()->GetVolume()->GetName();
+
+    G4ThreeVector momentum = aStep -> GetPreStepPoint() ->GetMomentumDirection ();
+
+
     NNbarHit* detectorHit = new NNbarHit();
 
-    // Make this kinetic energy and position
     detectorHit -> SetLocalTime(localTime);
     detectorHit -> SetParentID(parentID);
     detectorHit -> SetProcess(proc);
@@ -162,10 +171,31 @@ G4bool TubeSD::ProcessHits(G4Step* aStep, G4TouchableHistory* )
     detectorHit -> SetPosX(x);
     detectorHit -> SetPosY(y);
     detectorHit -> SetPosZ(z);
-
-    HitsCollection -> insert(detectorHit);
-    //}
-    return true;
+    
+    detectorHit -> SetPX(momentum.getX());
+    detectorHit -> SetPY(momentum.getY());
+    detectorHit -> SetPZ(momentum.getZ());
+    
+    detectorHit -> SetVolName(current_vol);
+    detectorHit -> SetOriginVolName(origin_vol);
+    
+    if (aStep->IsFirstStepInVolume() && (aStep->IsLastStepInVolume())){
+        detectorHit -> SetStepInfo(2);
+        HitsCollection -> insert(detectorHit);
+        return true;
+    }
+    
+    else if (aStep->IsFirstStepInVolume()){
+        detectorHit -> SetStepInfo(0);
+        HitsCollection -> insert(detectorHit);
+        return true;
+    }
+    
+    else if (aStep->IsLastStepInVolume()){
+        detectorHit -> SetStepInfo(1);
+        HitsCollection -> insert(detectorHit);
+        return true;
+    }
 }
 
 //......

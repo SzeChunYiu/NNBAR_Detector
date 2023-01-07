@@ -56,7 +56,7 @@ set(CRY_PATH "/home/billy/nnbar/cry_v1.7")
 endif()
 
 set(CRY_INCLUDE_DIRS "${CRY_PATH}/src")
-set(CRY_LIBRARY_DIR ${CRY_PATH}/lib)
+set(CRY_LIBRARY_DIR "${CRY_PATH}/lib")
 set(CRY_LIBRARIES "${CRY_PATH}/lib/libCRY.a")
 
 message(${CRY_INCLUDE_DIRS})

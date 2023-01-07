@@ -71,6 +71,7 @@ NNbarHit::NNbarHit(const NNbarHit& right)
     group_ID_ = right.group_ID_;
     module_ID_= right.module_ID_;
     vol_name = right.vol_name;
+    origin_vol_name = right.origin_vol_name;
     posX = right.posX;
     posY = right.posY;
     posZ = right.posZ;
@@ -81,12 +82,11 @@ NNbarHit::NNbarHit(const NNbarHit& right)
     py = right.py;
     pz = right.pz;
 
-
-
     TrackLength = right.TrackLength;
     energyDeposit = right.energyDeposit;
     kinEnergy = right.kinEnergy;
     photons = right.photons;
+    step_info = right.step_info;
 }
 
 const NNbarHit& NNbarHit::operator=(const NNbarHit& right)
@@ -113,9 +113,11 @@ const NNbarHit& NNbarHit::operator=(const NNbarHit& right)
     posZ_particle = right.posZ_particle;
     TrackLength = right.TrackLength;
     vol_name = right.vol_name;
+    origin_vol_name = right.origin_vol_name;
     energyDeposit = right.energyDeposit;
     kinEnergy = right.kinEnergy;
     photons = right.photons;
+    step_info = right.step_info;
 
     return *this;
 }

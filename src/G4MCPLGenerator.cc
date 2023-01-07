@@ -7,20 +7,36 @@
 #include "G4ios.hh"
 #include <cassert>
 #include <G4ParticleDefinition.hh>
+#include "G4Threading.hh"
+#include <boost/lexical_cast.hpp>
 
 using namespace std;
 
 //int particle_name_file_index;
 extern std::ofstream Particle_outFile;
 extern std::vector<std::vector<G4double>> particle_gun_record;
-extern G4double event_number;
+extern G4double event_number_global;
+
 extern G4int run_number;
+//extern std::vector<int> thread_event_number;
+
+using boost::lexical_cast;
+#include "G4AutoLock.hh"
+
+G4ThreadLocal G4double event_number;
+G4ThreadLocal G4double event_number_event_action;
+G4ThreadLocal G4int local_event_number_MCPL;
+G4ThreadLocal G4int initial_local_event_number_MCPL = 0;
+G4ThreadLocal G4int updated_local_event_number_MCPL;
+G4ThreadLocal G4int flag_MCPL; // flaggin the event with event ID = 0 !!
+namespace { G4Mutex MCPLMutex = G4MUTEX_INITIALIZER;}
 
 //std::string filename_event = "./mcpl_files/HIBEAM_tsol_signal_GBL_jbar_100k_9000_event_length_info.csv";
-//std::string filename_event =./mcpl_filesHIBEAM_tsol_signal_GBL_jbar_100k_9000_event_length_info.csv";
 std::string filename_event = "./mcpl_files/NNBAR_mfro_signal_GBL_jbar_50k_9001_event_length_info.csv";
+//std::string filename_event = "./mcpl_files/NNBAR_rwag_optics_McStas_bmei_436K_0006_event_length_info.csv";
+//std::string filename_event = "./mcpl_files/nnbar_cosmic_neutron_event_length_info.csv";
 
-std::vector<int> data_event_num;
+G4ThreadLocal std::vector<int> data_event_num;
 
 void import_event_num(std::string file_name, std::vector<int>& data) {
 	
@@ -34,14 +50,15 @@ void import_event_num(std::string file_name, std::vector<int>& data) {
       std::istringstream iss(row);
 			std::string token;
 			while (std::getline(iss, token, ',')) {
-				data.push_back(std::stoi(token.c_str()));
+        //std::cout<<std::stoi(token.c_str())<<std::endl;
+				data.push_back(boost::lexical_cast<double>(token.c_str()));
 			}
 	  }
 		init_file.close();
   }
 
   std::cout << "Length of number event " << data.size() << std::endl;
-  std::cout << "Number event test:: " << data[0] << " " << data[1] << " " << data[2] << std::endl;
+  std::cout << "Number event test:: " << data[0] << " " << data[1] << " " << data.back() << std::endl;
 	return;
 }
 
@@ -54,6 +71,7 @@ G4MCPLGenerator::G4MCPLGenerator(const G4String& inputFile)
     m_inputFile(inputFile)
 {
   m_mcplfile.internal = 0;
+  G4AutoLock lock(&MCPLMutex);
   import_event_num(filename_event,data_event_num);
 }
 
@@ -61,107 +79,166 @@ G4MCPLGenerator::~G4MCPLGenerator()
 {
   if (m_nUnknownPDG) {
     std::ostringstream cmt;
-    cmt << "Ignored a total of " << m_nUnknownPDG
-        << " particles in input due to untranslatable pdg codes";
-    G4Exception("G4MCPLGenerator::~G4MCPLGenerator()", "G4MCPLGenerator07",
-                JustWarning, cmt.str().c_str());
+    cmt << "Ignored a total of " << m_nUnknownPDG << " particles in input due to untranslatable pdg codes";
+    G4Exception("G4MCPLGenerator::~G4MCPLGenerator()", "G4MCPLGenerator07",JustWarning, cmt.str().c_str());
   }
+
   if (m_mcplfile.internal)
     mcpl_close_file(m_mcplfile);
   delete m_gun;
 }
 
-bool G4MCPLGenerator::UseParticle(const mcpl_particle_t*) const
-{
-  return true;
-}
+bool G4MCPLGenerator::UseParticle(const mcpl_particle_t*) const{return true;}
 
-void G4MCPLGenerator::ModifyParticle(G4ThreeVector&, G4ThreeVector&,
-                                     G4ThreeVector&, G4double&, G4double&) const
-{
-}
+void G4MCPLGenerator::ModifyParticle(G4ThreeVector&, G4ThreeVector&, G4ThreeVector&, G4double&, G4double&) const{}
 
 void G4MCPLGenerator::GeneratePrimaries(G4Event* evt)
 {
+  G4AutoLock lock(&MCPLMutex);
+  local_event_number_MCPL = event_number_global; 
+  evt->SetEventID(event_number_global);
+  event_number_global++;
+
+  if (local_event_number_MCPL == 0){flag_MCPL = 1;} //_MCPL
+
   if (!m_mcplfile.internal) {
     //Initialise:
     m_mcplfile = mcpl_open_file(m_inputFile.c_str());
     m_gun = new G4ParticleGun(1);
     FindNext();
-    if (!m_p) {
-      G4Exception("G4MCPLGenerator::G4MCPLGenerator()", "G4MCPLGenerator01",
-                  RunMustBeAborted, "Not a single suitable particle found in input file");
-    }
+    if (!m_p) {G4Exception("G4MCPLGenerator::G4MCPLGenerator()", "G4MCPLGenerator01",RunMustBeAborted, "Not a single suitable particle found in input file");}
   }
 
   if (!m_p) {
-    G4Exception("G4MCPLGenerator::GeneratePrimaries()", "G4MCPLGenerator02",
-                RunMustBeAborted, "GeneratePrimaries called despite no suitable"
-                " particles existing.");
-    G4RunManager::GetRunManager()->AbortRun(false);//hard abort
-    return;
+    
+    std::cout << "********* out of particles -- reload in progress ************ " << std::endl;
+    // G4Exception("G4MCPLGenerator::GeneratePrimaries()", "G4MCPLGenerator02",
+    //             RunMustBeAborted, "GeneratePrimaries called despite no suitable"
+    //             " particles existing.");
+
+    m_mcplfile = mcpl_open_file(m_inputFile.c_str());
+    m_gun = new G4ParticleGun(1);
+    // event_number = 0;
+    // local_event_number_MCPL = 0;
+    // initial_local_event_number_MCPL = 0;
+    FindNext();
+    
+    if (!m_p) { //if reloading the sample doesn't work then give up!
+      G4RunManager::GetRunManager()->AbortRun(false);//hard abort
+      return;
+    }
+  }
+
+
+  // determines how many events it has to skip (generated by other threads)
+  int event_diff = local_event_number_MCPL - initial_local_event_number_MCPL;
+  std::cout << local_event_number_MCPL << "," << initial_local_event_number_MCPL << "|| #### check event diff: " << event_diff << std::endl;
+
+
+  if (initial_local_event_number_MCPL == 0){
+    if (flag_MCPL ==0){
+    for (int i = initial_local_event_number_MCPL; i < initial_local_event_number_MCPL + event_diff; i++){
+      for (int j = 0; j < data_event_num[int(i)]; j++){FindNext();} // skip all these
+      }
+    }
+  
+
+    else{
+      for (int i = initial_local_event_number_MCPL+1; i < initial_local_event_number_MCPL + event_diff; i++){
+        for (int j = 0; j < data_event_num[int(i)]; j++){FindNext();} // skip all these
+      }
+    }
+  }
+
+  else{
+    for (int i = initial_local_event_number_MCPL+1; i < initial_local_event_number_MCPL + event_diff; i++){
+      for (int j = 0; j < data_event_num[int(i)]; j++){
+        FindNext(); // skip all these
+      }
+    }
   }
 
   //Transfer m_p info to gun and shoot:
   G4ParticleTable * particleTable = G4ParticleTable :: GetParticleTable();
-  int event_count = data_event_num[int(event_number)];
+  int event_count = data_event_num[int(local_event_number_MCPL)]; //1; //
 
+  std::cout<< "Thread ID " << G4Threading::G4GetThreadId() << "Event Number: "<< event_number_global << " -- event:" << local_event_number_MCPL << " ;; count:" << event_count << " E0 "<< initial_local_event_number_MCPL << std::endl;
+  
   for (int i=0; i<event_count; i++){
   //if (m_p->pdgcode==111){
+    //if (initial_local_event_number>0){FindNext();}
+  
     assert(m_currentPDG == m_p->pdgcode && m_currentPartDef);
     m_gun->SetParticleDefinition(m_currentPartDef);
-    G4ThreeVector pos(m_p->position[0],m_p->position[1],-1.0); //m_p->position[2] 
+    G4ThreeVector pos(m_p->position[0],m_p->position[1],m_p->position[2]);
+    //G4ThreeVector pos((1.0+G4UniformRand()*0.01)*m_p->position[0]+10.,(1.0+G4UniformRand()*0.01)*m_p->position[1]+60.,-600); //m_p->position[2] 
+    //std::cout << sqrt(pow(pos[0],2) + pow(pos[1],2)) << std::endl;
     pos *= CLHEP::cm;
-    G4ThreeVector dir(m_p->direction[0],m_p->direction[1],m_p->direction[2]);
+    G4ThreeVector dir((1.0+G4UniformRand()*0.01)*m_p->direction[0],(1.0+G4UniformRand()*0.01)*m_p->direction[1],(1.0+G4UniformRand()*0.01)*m_p->direction[2]);
     G4ThreeVector pol(m_p->polarisation[0],m_p->polarisation[1],m_p->polarisation[2]);
-    double time = m_p->time*CLHEP::millisecond;
+    G4double KE = (1.0+G4UniformRand()*0.01)*m_p->ekin;
+    double dt = 68.5;
+    double time = m_p->time*ms; //(std::floor(run_number)*(2.86+dt) + m_p->time)*CLHEP::millisecond;
+
+    // std::cout << " = = = = = = = = = = = = = = = " <<std::endl;
+    // std::cout << "time mcpl:" << m_p->time << "total time: "<< time <<std::endl;
+    // std::cout << "position of the particle: " << pos << std::endl;
+    //std::cout << "after *cm, radius from center : " <<sqrt(pow(pos[0],2) + pow(pos[1],2)) << " /10 :: " << sqrt(pow(pos[0],2) + pow(pos[1],2))/10 << std::endl;
+
     double weight = m_p->weight;
     ModifyParticle(pos,dir,pol,time,weight);
 
     m_gun->SetParticleMomentumDirection(dir);
     m_gun->SetParticlePosition(pos);
-    m_gun->SetParticleEnergy(m_p->ekin);//already in MeV and CLHEP::MeV=1
-    m_gun->SetParticleTime(0); //time
+    m_gun->SetParticleEnergy(KE);//already in MeV and CLHEP::MeV=1
+    m_gun->SetParticleTime(time); //time
     m_gun->SetParticlePolarization(pol);
     const G4int ivertex = evt->GetNumberOfPrimaryVertex();
-    
-    if (sqrt(pow(m_p->position[0],2) + pow(m_p->position[1],2))<80.0){
 
-      Particle_outFile << event_number << ",";
-      Particle_outFile << m_p->userflags<< ",";
-      Particle_outFile << m_p->pdgcode << ",";
-      Particle_outFile << particleTable -> FindParticle(m_p->pdgcode) -> GetPDGMass() << ",";
-      Particle_outFile << particleTable -> FindParticle(m_p->pdgcode) -> GetPDGCharge() << ",";
-      Particle_outFile << m_p->ekin << ",";
-      Particle_outFile << m_p->position[0] << ",";
-      Particle_outFile << m_p->position[1] << ",";
-      Particle_outFile << m_p->position[2] << ",";
-      Particle_outFile << m_p -> time/s << ",";
-      Particle_outFile << m_p->direction[0] << ",";
-      Particle_outFile << m_p->direction[1] << ",";
-      Particle_outFile << m_p->direction[2] << G4endl;
+    double angle = 0.0;
 
-      m_gun->GeneratePrimaryVertex(evt);
-      std::cout << "== Seq number: " << event_number << ", Event_number: " << m_p->userflags << "," << m_p->pdgcode << "," << " mass : " << particleTable -> FindParticle(m_p->pdgcode) -> GetPDGMass() << ","
-      << m_p->ekin << "," << m_p->position[0] << "," << m_p->position[1] << ","     
-      << m_p->position[2] << ", d^2:" << sqrt(pow(m_p->position[0],2) + pow(m_p->position[1],2)+pow(m_p->position[2],2))<< " , time: " << m_p -> time/s << ","  << m_p->direction[0] << "," << m_p->direction[1] << "," << m_p->direction[2] << std::endl;
-    //}
-    
-    if (weight!=1.0) {evt->GetPrimaryVertex(ivertex)->SetWeight(weight);}}
-  //}
+    if ((sqrt(pow(pos[0],2) + pow(pos[1],2))/10.0)<100.0){ // 180.0 cm // mm -> cm // signal
+    // if ((sqrt(pow(pos[0],2) + pow(pos[1],2))/10.0)<180.0){ // 180.0 cm // mm -> cm
+    //   if ((KE)<0.1*eV){ 
 
-    //Prepare for next.
-    FindNext();
-    if (!m_p) {
-      G4cout << "G4MCPLGenerator: No more particles to use from input file after this event. Requesting soft abort of run." << G4endl;
-      G4RunManager::GetRunManager()->AbortRun(true);//soft abort
+        std::cout<< "**** Event Accepted" << std::endl;
+
+        Particle_outFile << evt->GetEventID()<< ",";
+        Particle_outFile << m_p->userflags<< ",";
+        Particle_outFile << m_p->pdgcode << ",";
+        Particle_outFile << particleTable -> FindParticle(m_p->pdgcode) -> GetPDGMass() << ",";
+        Particle_outFile << particleTable -> FindParticle(m_p->pdgcode) -> GetPDGCharge() << ",";
+        Particle_outFile << KE << ",";
+        Particle_outFile << angle << ",";
+        Particle_outFile << pos[0] << ",";
+        Particle_outFile << pos[1] << ",";
+        Particle_outFile << pos[2] << ",";
+        Particle_outFile << std::setprecision(13) << time/ms << std::setprecision(5) << ",";
+        Particle_outFile << dir[0] << ",";
+        Particle_outFile << dir[1] << ",";
+        Particle_outFile << dir[2] << ",";
+        Particle_outFile << std::setprecision(10) << weight << G4endl;
+
+        m_gun->GeneratePrimaryVertex(evt);
+        std::cout << "Thread ID " << G4Threading::G4GetThreadId() << " :: Event ID from software" << evt->GetEventID() << " || Local event ID: " << local_event_number_MCPL <<
+                  "\n Partices in this event: " <<event_count <<  ", seq: " << i << "," << m_p->pdgcode << ", KE: " << m_p->ekin << std::endl;
+
+        if (weight!=1.0) {evt->GetPrimaryVertex(ivertex)->SetWeight(weight);}
+    //   }
     }
+    
+    //Prepare for next.
+    FindNext();//if (initial_local_event_number_MCPL==0){}
   } // end bracket for loop
+
+  initial_local_event_number_MCPL = local_event_number_MCPL;
+
 }
 
 void G4MCPLGenerator::FindNext()
 {
-  while( ( m_p = mcpl_read(m_mcplfile) ) ) {
+
+  while( ( m_p = mcpl_read(m_mcplfile))) {
 
     if (!UseParticle(m_p))
       continue;

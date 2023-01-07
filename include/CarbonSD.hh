@@ -23,38 +23,40 @@
 // * acceptance of all terms of the Geant4 Software license.          *
 // ********************************************************************
 //
-// 
+// See more at: https://twiki.cern.ch/twiki/bin/view/Geant4/AdvancedExamplesHadrontherapy
 
-#ifndef RunAction_h
-#define RunAction_h 1
+#ifndef CarbonSD_h
+#define CarbonSD_h 1
 
-#include "G4UserRunAction.hh"
+#include "NNbarHit.hh"
+//#include "CarbonHit.hh"
+
+
+#include "G4VSensitiveDetector.hh"
 #include "globals.hh"
-#include <string>
-#include <vector>
-#include "PrimaryGeneratorAction.hh"
-#include "G4GenericMessenger.hh"
 
-class G4Run;
-
-
-class RunAction : public G4UserRunAction
+class G4Step;
+class G4HCofThisEvent;
+class G4TouchableHistory;
+class CarbonSD : public G4VSensitiveDetector
 {
-  public:
-    RunAction();
-    virtual ~RunAction();
-	std::vector<string> particle_name{ "Neutron","Proton","Gamma","Electron","Muon","Pion","Kaon" };
-    G4Run* GenerateRun();
-    virtual void BeginOfRunAction(const G4Run*);
-    virtual void   EndOfRunAction(const G4Run*);
-
-    private:
-        G4GenericMessenger* fMessenger;
-
-
+public:
+    CarbonSD(G4String name);
+    ~CarbonSD();
+    
+    
+    std::ofstream ofs;
+    void Initialize(G4HCofThisEvent*);
+    
+    G4bool ProcessHits(G4Step*aStep,G4TouchableHistory*ROhist);
+    
+    void EndOfEvent(G4HCofThisEvent*HCE);
+    
+private:
+    NNbarHitsCollection *HitsCollection;
+    G4String sensitiveDetectorName;
+	int error_count;
 };
-
-//....
-
 #endif
+
 

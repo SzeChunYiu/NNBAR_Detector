@@ -15,14 +15,27 @@
 #include <iostream>
 #include "boost/random.hpp"
 #include "boost/generator_iterator.hpp"
+#include "G4Threading.hh"
+#include "G4AutoLock.hh"
+
+#include "G4Run.hh"
+#include "G4RunManager.hh"
+#include "G4UnitsTable.hh"
+#include "G4SystemOfUnits.hh"
+#include "G4GenericMessenger.hh"
+#include  "mcpl.h"
 
 using namespace std;
 
 extern std::ofstream Particle_outFile;
 extern std::vector<std::vector<G4double>> particle_gun_record;
-extern G4double event_number;
+extern G4double event_number_global;
 extern G4int run_number;
 
+G4ThreadLocal G4int local_event_number_CRY;
+namespace {G4Mutex PrimaryGeneratorCRYMutex = G4MUTEX_INITIALIZER;}
+// extern mcpl_outfile_t f;
+// extern mcpl_particle_t * p;
 
 std::vector<std::vector<double>> Energy_range
 {
@@ -38,12 +51,9 @@ boost::random::mt19937 rng;
 
 PrimaryGeneratorAction_CRY::PrimaryGeneratorAction_CRY():fParticleGun(nullptr)
 {
+	//G4AutoLock lock(&PrimaryGeneratorCRYMutex);
 	const char* inputfile = "setup.file";
 	fMessenger = new G4GenericMessenger(this, "/particle_generator/", "Name the particle for the file name");
-	//G4GenericMessenger::Command& filenameCMD = fMessenger->DeclareProperty("Particle_index", particle_name_file_index, "Index of the particle in the order");
-	//filenameCMD.SetParameterName("Particle Index", true);
-	//filenameCMD.SetDefaultValue("99");
-
 	fParticleGun = new G4ParticleGun();
 
 	std::ifstream inputFile;
@@ -56,6 +66,7 @@ PrimaryGeneratorAction_CRY::PrimaryGeneratorAction_CRY():fParticleGun(nullptr)
 			std::cerr << "PrimaryGeneratorAction: Failed to open CRY input file= " << inputfile << std::endl;
 		InputState = -1;
 	}
+
 	else {
 		std::string setupString("");
 		while (!inputFile.getline(buffer, 1000).eof()) {
@@ -79,6 +90,7 @@ PrimaryGeneratorAction_CRY::PrimaryGeneratorAction_CRY():fParticleGun(nullptr)
 	gunMessenger = new PrimaryGeneratorMessenger_CRY(this);
 	std::cerr << "Input state: " << InputState << std::endl;
 	std::cerr << "particle table: " << particleTable << std::endl;
+  
 }
 
 //....
@@ -96,8 +108,8 @@ void PrimaryGeneratorAction_CRY::InputCRY()
 //----------------------------------------------------------------------------//
 void PrimaryGeneratorAction_CRY::UpdateCRY(std::string * MessInput)
 {
+	//G4AutoLock lock(&PrimaryGeneratorCRYMutex);
 	CRYSetup* setup = new CRYSetup(*MessInput, "/home/billy/nnbar/cry_v1.7/data");
-
 	gen = new CRYGenerator(setup);
 
 	// set random number generator
@@ -109,6 +121,7 @@ void PrimaryGeneratorAction_CRY::UpdateCRY(std::string * MessInput)
 
 void PrimaryGeneratorAction_CRY::CRYFromFile(G4String newValue)
 {
+	//G4AutoLock lock(&PrimaryGeneratorCRYMutex);
 	// Read the cry input file
 	std::ifstream inputFile;
 	inputFile.open(newValue, std::ios::in);
@@ -138,11 +151,14 @@ void PrimaryGeneratorAction_CRY::CRYFromFile(G4String newValue)
 	}
 
 	std::cerr << "Input state after CRYFromFile: " << InputState << std::endl;
-
+ 
 }
 
 void PrimaryGeneratorAction_CRY::GeneratePrimaries(G4Event * anEvent)
-{
+{	
+	anEvent->SetEventID(event_number_global);
+	local_event_number_CRY = anEvent->GetEventID(); //event_number; //_MCPL
+	event_number_global++;
 
 	if (InputState != 0) {
 		G4String* str = new G4String("CRY library was not successfully initialized");
@@ -154,83 +170,66 @@ void PrimaryGeneratorAction_CRY::GeneratePrimaries(G4Event * anEvent)
 	G4double t; G4double px; G4double py; G4double pz;
 	G4double KE;
 
+	G4AutoLock lock(&PrimaryGeneratorCRYMutex);
 	G4String particleName;
 	vect->clear();
 	gen->genEvent(vect);
 
-	int index_ = std::floor(run_number/100);
+	int index_ = std::floor(run_number); ///100
 	if (index_ > 5){index_=5;}
 
 	std::vector<double> Energy_range_run = Energy_range[index_];
 	boost::random::uniform_int_distribution<> KE_generator(Energy_range_run[0],Energy_range_run[1]); //std::floor(i/b)
 
-	//std::cout <<  " = = = = " << Energy_range_run[0] << "," << Energy_range_run[1] << " :: " << run_number << " " << std::floor(run_number/20) <<std::endl; 
+	
+	std::cout << "Worker:"<< G4Threading::G4GetThreadId() << " = = " << std::fixed << (int)local_event_number_CRY <<  " event size:" << vect->size() << std::endl; 
+	//for (unsigned j = 0; j < vect->size(); j++) {std::cout << "Particle Time: " << (*vect)[j]->t() << std::endl;}
 
-	for (unsigned j = 0; j < vect->size(); j++) {
+	for (unsigned  j = 0; j < vect->size(); j++) {
 		
 
 		std::vector<G4double> particle_gun_record_row;
 
 		particleName = CRYUtils::partName((*vect)[j]->id());
-		//(*vect)[j]->x()
-		x = (*vect)[j]->x()* m;
-		y = 5.0*m;
-		
-		z = (*vect)[j]->y()* m; // (*vect)[j]->z() * m
+		x = (*vect)[j]->x()* m; //(*vect)[j]->x()* m;
+		y = 5.0*m;//5.0*m;
+		z = (*vect)[j]->y()*m;// (*vect)[j]->y()* m; // (*vect)[j]->z() * m
 
-
-		//int x = KE_generator(rng); 
 		KE = KE_generator(rng)*MeV;//(*vect)[j]->ke()*MeV;//5000.0*MeV; // // here we need to customize the energy in order to get the desired energy
 		px = (*vect)[j]->u();//(*vect)[j]->u();
 		py = (*vect)[j]->w();//(*vect)[j]->v();
 		pz = (*vect)[j]->v(); //(*vect)[j]->w();
-		t = (*vect)[j]->t();
+		t =  (*vect)[j]->t()*s;
 
-		G4String all_type[7] = { "neutron","proton","gamma","electron","muon","pion","kaon" };
-		G4double name_ID = 99;
 
-		//for (int i = 0; i <= 6; i++) { if (particleName == all_type[i]) { name_ID = i; break; } }
-		fParticleGun->SetParticleDefinition(particleTable->FindParticle((*vect)[j]->PDGid()));
-		fParticleGun->SetParticleEnergy(KE);
-		fParticleGun->SetParticlePosition(G4ThreeVector(x, y, z));
-		fParticleGun->SetParticleMomentumDirection(G4ThreeVector(px, py, pz)); //(*vect)[j]->w())
-		fParticleGun->SetParticleTime((*vect)[j]->t());
-		
-		std::cout << std::fixed << (int)event_number << "  " << particleName << " ID: " << (*vect)[j]->PDGid() << " charge= " << (*vect)[j]->charge() << " "
+	    // p->position[0] = x; p->position[1] = y;p->position[2] = z;
+        // p->direction[0] = px; p->direction[1] = py; p->direction[2] = pz;
+        // p->ekin = KE;
+        // p->time = t/ms;
+
+        // p->pdgcode = (*vect)[j]->PDGid();
+        // p->weight = 1;
+        // p->userflags =  anEvent->GetEventID();
+        // mcpl_add_particle(f,p);
+
+
+		std::cout << 
+			G4Threading::G4GetThreadId() << " = = "
+			//<<std::fixed << (int)local_event_number_CRY << "  " << particleName << " ID: " << (*vect)[j]->PDGid() << " charge= " << (*vect)[j]->charge() << " "
 			<< setprecision(4)
 			<< " energy (MeV)=" << KE << " "
-			<< " pos (m)"
-			<< G4ThreeVector((*vect)[j]->x(), (*vect)[j]->y(), y/m)
-			<< " " << "direction cosines "
-			<< G4ThreeVector((*vect)[j]->u(), (*vect)[j]->w(), (*vect)[j]->v())
+			//<< " pos (m)"
+			//<< G4ThreeVector((*vect)[j]->x(), (*vect)[j]->y(), y/m)
+			//<< " " << "direction cosines "
+			//<< G4ThreeVector((*vect)[j]->u(), (*vect)[j]->w(), (*vect)[j]->v())
 			<< " " << "Particle Time: " << (*vect)[j]->t() 
 		<< std::endl;
 
-
-		
-
-		if (run_number>=518){
-
-			Particle_outFile <<  event_number << ",";
-			Particle_outFile <<  event_number << ",";
-			Particle_outFile <<  (*vect)[j]->PDGid() << ","; //PID
-			Particle_outFile << particleTable->FindParticle((*vect)[j]->PDGid())-> GetPDGMass() << ",";
-			Particle_outFile <<  particleTable -> FindParticle((*vect)[j]->PDGid())->  GetPDGCharge()  << ","; // charge 
-			Particle_outFile <<  KE << ","; // 100+n*10 
-			Particle_outFile <<  x << ",";
-			Particle_outFile <<  y << ",";
-			Particle_outFile <<  z << ",";
-			Particle_outFile <<  t << ",";
-			Particle_outFile <<  px << ",";
-			Particle_outFile <<  py << ",";
-			Particle_outFile <<  pz << G4endl;
-
-			fParticleGun->GeneratePrimaryVertex(anEvent);
-		}
-
+		// fParticleGun->GeneratePrimaryVertex(anEvent);
 		delete (*vect)[j];
 	
 	}
+	
 }
 
 //....

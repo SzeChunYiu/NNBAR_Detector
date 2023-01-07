@@ -1,0 +1,16 @@
+/run/initialize
+/tracking/verbose 0
+
+/CRY/input returnNeutrons 0
+/CRY/input returnProtons 0
+/CRY/input returnGammas 0
+/CRY/input returnElectrons 0
+/CRY/input returnMuons 1
+/CRY/input returnPions 0
+/CRY/input date 9-16-2020
+/CRY/input latitude 59.33
+/CRY/input altitude 0
+/CRY/input subboxLength 1
+/CRY/update
+
+/run/beamOn 1

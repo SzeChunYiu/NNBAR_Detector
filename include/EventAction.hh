@@ -56,13 +56,17 @@ private:
   G4int  fAbsoTrackLengthHCID;
   G4int  fCerenkovHCID;
   G4int  fScintTrackLengthHCID;
-  G4int  scintHitsCollectionID;
-  G4int  absHitsCollectionID;
+
+  G4int  SiliconHitsCollectionID;
+
+  G4int  CarbonHitsCollectionID;
   G4int  tubeHitsCollectionID;
   G4int  TPCHitsCollectionID;
+  
+  G4int  scintHitsCollectionID;
+  G4int  absHitsCollectionID;
   G4int  PMTHitsCollectionID;
   G4int  ShieldHitsCollectionID;
-  G4int  SiliconHitsCollectionID;
   
   G4int b = 1;
   G4int ltime     = 0.;

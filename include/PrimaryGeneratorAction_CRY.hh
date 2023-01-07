@@ -18,6 +18,7 @@
 #include "PrimaryGeneratorMessenger_CRY.hh"
 #include "G4ParticleDefinition.hh"
 #include "G4GenericMessenger.hh"
+#include "G4Threading.hh"
 
 using namespace std;
 

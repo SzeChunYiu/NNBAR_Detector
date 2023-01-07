@@ -139,6 +139,7 @@ G4bool SiliconSD::ProcessHits(G4Step* aStep, G4TouchableHistory* )
     parentID = theTrack->GetParentID();
 
     G4String proc = "primary"; 
+    
     if (trackID > 1){
         parentID = theTrack->GetParentID();
 		if (parentID!=0){ proc = theTrack->GetCreatorProcess()->GetProcessName(); }
@@ -152,7 +153,19 @@ G4bool SiliconSD::ProcessHits(G4Step* aStep, G4TouchableHistory* )
     // Get the step average kinetic energy
     G4double eKinMean = (eKinPre + eKinPost) * 0.5;
 
+    G4ThreeVector momentum = aStep -> GetPreStepPoint() ->GetMomentumDirection ();
+
+
+    
+    G4String origin_vol = theTrack->GetOriginTouchable()->GetVolume()->GetName();
+    
+
+
     NNbarHit* detectorHit = new NNbarHit();
+    
+    detectorHit -> SetOriginVolName(origin_vol);
+    if (aStep->IsFirstStepInVolume()){detectorHit -> SetStepInfo(1);} // 1 means it is first step
+    else{detectorHit -> SetStepInfo(0);} // not the first step
 
     // Make this kinetic energy and position
     detectorHit -> SetLocalTime(localTime);
@@ -166,12 +179,18 @@ G4bool SiliconSD::ProcessHits(G4Step* aStep, G4TouchableHistory* )
     detectorHit -> SetPosZ(tracklength);
     detectorHit -> SetEDep(energyDeposit);
     detectorHit -> SetKinEn(eKinPost);
+    detectorHit -> SetPX(momentum.getX());
+    detectorHit -> SetPY(momentum.getY());
+    detectorHit -> SetPZ(momentum.getZ());
     detectorHit -> SetPosX(x);
     detectorHit -> SetPosY(y);
     detectorHit -> SetPosZ(z);
 
     HitsCollection -> insert(detectorHit);
     //}
+
+    // ***** Kill the particle after reaching the disk to prevent extra interaction with the disk!
+    //theTrack->SetTrackStatus(fStopAndKill);
     return true;
 }
 

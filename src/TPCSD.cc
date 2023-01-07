@@ -146,9 +146,9 @@ G4bool TPCSD::ProcessHits(G4Step* aStep, G4TouchableHistory* )
     if (particleName != "opticalphoton") {
             const std::vector<const G4Track*>* secondary = aStep->GetSecondaryInCurrentStep();
             for (int j = 0; j < (*secondary).size(); j++) {
-                    particle = (*secondary)[j]->GetDefinition();
-                    if (particle->GetParticleName() == "e-") {electrons++;}
-                    else {std::cout<< particle->GetParticleName() << std::endl;} // Cerenkov exists in scintillator
+                particle = (*secondary)[j]->GetDefinition();
+                if (particle->GetParticleName() == "e-") {electrons++;}
+                else {std::cout<< particle->GetParticleName() << std::endl;} // Cerenkov exists in scintillator
             }
     }
 
@@ -169,9 +169,13 @@ G4bool TPCSD::ProcessHits(G4Step* aStep, G4TouchableHistory* )
     detectorHit -> SetTime(time);
     detectorHit -> SetName(name);
     detectorHit -> SetTrackID(trackID);
-    
+
+    G4String origin_vol = theTrack->GetOriginTouchable()->GetVolume()->GetName();
+    detectorHit -> SetOriginVolName(origin_vol);
+
     detectorHit -> SetXID(k);
     detectorHit -> SetMod_ID(TPC_index);
+    
 
     //return the position of the TPC long bar! 
     detectorHit -> SetPosX(TPC_x);
@@ -184,6 +188,15 @@ G4bool TPCSD::ProcessHits(G4Step* aStep, G4TouchableHistory* )
     detectorHit -> SetTrackLength(DX); // not actually trackLength but lets stay in this way..
     detectorHit -> SetEDep(energyDeposit);
     detectorHit -> SetKinEn(eKinPost);
+    
+    // check whether this is the first step in the volume
+    if (origin_vol!="TPCPV_blocks"){ //make sure that it is from outside
+        if (aStep->IsFirstStepInVolume()){detectorHit -> SetStepInfo(1);} // 1 means it is first step
+        else{detectorHit -> SetStepInfo(0);} // not the first step
+    }
+
+    else{detectorHit -> SetStepInfo(999);}
+
     HitsCollection -> insert(detectorHit);
     
     return true;

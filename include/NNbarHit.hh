@@ -78,7 +78,8 @@ private:
     G4int photons;
     G4double TrackLength;
     G4String vol_name;
-    
+    G4String origin_vol_name;
+    int step_info;
     
 public:
     inline G4double GetLocalTime(){return localTime;}
@@ -110,6 +111,8 @@ public:
     inline G4double GetOrigin(){return origin_rp;} // get which layer this hit particle is from
     inline G4int GetPhotons(){return photons;}
     inline G4String GetVolName(){return vol_name;}
+    inline G4String GetOriginVolName(){return origin_vol_name;}
+    inline int GetStepInfo(){return step_info;}
 
     inline void SetLocalTime(G4double ltime){localTime = ltime;}
     inline void SetParentID(G4int parent){parentID = parent;}
@@ -141,6 +144,8 @@ public:
     inline void SetOrigin(G4int origin) {origin_rp = origin;}
     inline void SetPhotons(G4int photon) {photons = photon;}
     inline void SetVolName(G4String name){vol_name=name;}
+    inline void SetOriginVolName(G4String name){origin_vol_name=name;}
+    inline void SetStepInfo(int step_info_){step_info=step_info_;}
 
 };
 

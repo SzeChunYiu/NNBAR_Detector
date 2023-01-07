@@ -180,6 +180,8 @@ G4bool AbsorberSD::ProcessHits(G4Step* aStep, G4TouchableHistory* )
     // Get the step average kinetic energy
     G4double eKinMean = (eKinPre + eKinPost) * 0.5;
 
+    G4String current_vol = aStep->GetPreStepPoint()->GetTouchable()->GetVolume()->GetName();
+
     NNbarHit* detectorHit = new NNbarHit();
     detectorHit -> SetLocalTime(localTime);
     detectorHit -> SetParentID(parentID);
@@ -195,6 +197,11 @@ G4bool AbsorberSD::ProcessHits(G4Step* aStep, G4TouchableHistory* )
     detectorHit -> SetEDep(energyDeposit);
     detectorHit -> SetKinEn(eKinPost);
     detectorHit-> SetPhotons(photons);
+    detectorHit -> SetVolName(current_vol);
+    G4String origin_vol = theTrack->GetOriginTouchable()->GetVolume()->GetName();
+    detectorHit -> SetOriginVolName(origin_vol);
+    if (aStep->IsFirstStepInVolume()){detectorHit -> SetStepInfo(1);} // 1 means it is first step
+    else{detectorHit -> SetStepInfo(0);}
 
     HitsCollection -> insert(detectorHit);
     return true;

@@ -14,7 +14,7 @@
 #include "G4BaryonConstructor.hh"
 #include "G4ShortLivedConstructor.hh"
 #include "G4IonConstructor.hh"
-
+#include "G4RadioactiveDecayPhysics.hh"
 
 #include "G4OpticalPhysics.hh"
 #include "G4Cerenkov.hh"
@@ -30,7 +30,7 @@
 
 #include "G4DecayPhysics.hh"
 #include "G4EmStandardPhysics.hh"
-#include "G4EmStandardPhysics_option4.hh"
+#include "G4EmStandardPhysics_option3.hh"
 #include "G4EmExtraPhysics.hh"
 #include "G4IonPhysics.hh"
 #include "G4StoppingPhysics.hh"
@@ -39,6 +39,7 @@
 
 #include "G4HadronPhysicsFTFP_BERT.hh"
 #include "G4HadronPhysicsFTFP_BERT_HP.hh"
+#include "G4HadronPhysicsQGSP_BERT_HP.hh"
 #include "PhysicsList.hh"
 
 #include "G4SystemOfUnits.hh"
@@ -48,15 +49,16 @@ PhysicsList::PhysicsList(): G4VModularPhysicsList()
 {
   defaultCutValue = 0.7*CLHEP::mm;  
   fConfig = G4LossTableManager::Instance()->EmConfigurator();
-  defaultCutValue = 1.0*mm;
-  SetVerboseLevel(1);
+  //defaultCutValue = 1.0*mm;
+  SetVerboseLevel(2);
 
   ConstructParticle();
 
  // EM Physics
-  RegisterPhysics(new G4EmStandardPhysics_option4());
-  RegisterPhysics(new G4EmExtraPhysics());
-  RegisterPhysics(new G4DecayPhysics() );
+  RegisterPhysics(new G4EmStandardPhysics_option3());
+  //RegisterPhysics(new G4EmExtraPhysics());
+  RegisterPhysics(new G4DecayPhysics());
+  RegisterPhysics(new G4RadioactiveDecayPhysics());
   RegisterPhysics(new G4HadronElasticPhysics());
   RegisterPhysics(new G4HadronPhysicsFTFP_BERT_HP());
   RegisterPhysics(new G4StoppingPhysics() );
