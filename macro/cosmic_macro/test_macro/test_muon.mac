@@ -1,0 +1,6 @@
+/run/initialize
+/tracking/verbose 0
+/physics_engine/neutron/timeLimit 10000 s
+
+/control/alias name muon
+/control/foreach ./macro/cosmic_macro/test_macro/cosmic_simulation.mac i "0 1 2 3 4 5"

@@ -1,0 +1,11 @@
+/run/initialize
+/tracking/verbose 0
+/physics_engine/neutron/timeLimit 10000 s
+
+/control/alias name muon
+/control/alias i 3
+/particle_generator/set_folder_name cosmic_{name}/cosmic_{name}_{i}
+/particle_generator/set_mcpl_file ./mcpl_files/cosmic_{name}_{i}.mcpl
+/particle_generator/set_run_number 0
+/particle_generator/set_event_number 1
+/control/loop ./macro/cosmic_macro/cosmic_muon/BeamOn.mac a 0 999 1 #1000 run * 1000 events = 1M

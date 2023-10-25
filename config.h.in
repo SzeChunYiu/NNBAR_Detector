@@ -1,0 +1,8 @@
+#ifndef CONFIG_H_IN
+#define CONFIG_H_IN
+ 
+#define TARGET_BUILD @TARGET_BUILD@
+#define MCPL_BUILD @MCPL_BUILD@
+#define DEBUG_VERBOSE @DEBUG_VERBOSE@
+
+#endif // CONFIG_H_IN

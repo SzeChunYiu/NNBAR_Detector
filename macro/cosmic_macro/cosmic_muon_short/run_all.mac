@@ -1,0 +1,6 @@
+/control/execute ./macro/cosmic_macro/cosmic_muon_short/run_muon_0.mac
+/control/execute ./macro/cosmic_macro/cosmic_muon_short/run_muon_1.mac
+/control/execute ./macro/cosmic_macro/cosmic_muon_short/run_muon_2.mac
+/control/execute ./macro/cosmic_macro/cosmic_muon_short/run_muon_3.mac
+/control/execute ./macro/cosmic_macro/cosmic_muon_short/run_muon_4.mac
+/control/execute ./macro/cosmic_macro/cosmic_muon_short/run_muon_5.mac

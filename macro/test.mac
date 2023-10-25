@@ -1,0 +1,4 @@
+#/particle_generator/set_mcpl_file ./mcpl_files/cosmic_muon_0.mcpl
+/run/beamOn 1000
+/run/beamOn 1000
+/run/beamOn 1000

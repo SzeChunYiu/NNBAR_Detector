@@ -1,0 +1,22 @@
+# Macro file for test
+
+/run/initialize
+/gun/particle mu+
+
+# mu+ 50 MeV 
+#/gun/momentum 50 MeV
+#
+# mu+ 75 MeV
+#/gun/momentum 0 0 75 MeV
+#
+# mu+ 100 MeV
+#/gun/momentum 0 0 100 MeV
+#
+# mu+ 200 MeV
+#/gun/momentum 0 0 200 MeV
+#
+## mu+ 400 MeV
+/gun/momentum 0 0 400 MeV
+
+/run/beamOn 10
+

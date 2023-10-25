@@ -1,0 +1,10 @@
+/run/initialize
+/tracking/verbose 0
+/physics_engine/neutron/timeLimit 10000 s
+
+/control/alias name signal
+/particle_generator/set_folder_name signal
+/particle_generator/set_mcpl_file ./mcpl_files/NNBAR_mfro_signal_GBL_jbar_50k_9001_HIBEAM_filtered.mcpl
+/particle_generator/set_run_number 0
+/particle_generator/set_event_number 1
+/control/loop ./macro/signal/BeamOn.mac a 0 49 1 #500 run * 1000 events = 1M

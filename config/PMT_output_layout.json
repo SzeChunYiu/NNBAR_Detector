@@ -1,0 +1,12 @@
+{
+    "fields":[
+        {"name": "Event_ID", "type": "int32"},
+        {"name": "Module_ID", "type": "int32"},
+        {"name": "x", "type": "double"},
+        {"name": "y", "type": "double"},
+        {"name": "z", "type": "double"},
+        {"name": "photons", "type": "int32"},
+        {"name": "KE", "type": "list1d", "contains": {"type": "double"}},
+        {"name": "t", "type": "list1d", "contains": {"type": "double"}}
+    ]
+}

@@ -1,0 +1,6 @@
+/particle_generator/set_folder_name test_cosmic_{name}/cosmic_{name}_{i}
+#### {name}/cosmic_{name}_{i}/
+/particle_generator/set_mcpl_file ./mcpl_files/cosmic_{name}_{i}.mcpl
+/particle_generator/set_run_number 0
+/particle_generator/set_event_number 
+/control/loop ./macro/cosmic_macro/test_macro/BeamOn.mac a 0 9 1 #just 1 run
