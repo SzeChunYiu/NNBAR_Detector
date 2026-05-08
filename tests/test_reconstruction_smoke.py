@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from nnbar_reconstruction.io import discover_runs, load_run
 from nnbar_reconstruction.reconstruction import (
@@ -185,6 +186,90 @@ def test_timing_windows_filter_scintillator_and_leadglass_hits_from_vertex(tmp_p
     assert row["leadglass_timing_edep"] == 100.0
     assert row["leadglass_out_of_time_edep"] == 200.0
     assert row["calorimeter_timing_edep"] == 130.0
+
+
+def test_photon_directions_use_reconstructed_vertex_for_pi0_mass(tmp_path: Path) -> None:
+    _write(
+        pd.DataFrame(
+            [
+                {
+                    "Event_ID": 1,
+                    "Track_ID": 1,
+                    "x": 20.0,
+                    "y": 10.0,
+                    "z": 10.0,
+                    "px": 1.0,
+                    "py": 0.0,
+                    "pz": 1.0,
+                    "t": 1.0,
+                    "eDep": 0.1,
+                    "trackl": 1.0,
+                },
+                {
+                    "Event_ID": 1,
+                    "Track_ID": 1,
+                    "x": 30.0,
+                    "y": 10.0,
+                    "z": 20.0,
+                    "px": 1.0,
+                    "py": 0.0,
+                    "pz": 1.0,
+                    "t": 2.0,
+                    "eDep": 0.1,
+                    "trackl": 1.0,
+                },
+                {
+                    "Event_ID": 1,
+                    "Track_ID": 2,
+                    "x": 10.0,
+                    "y": 20.0,
+                    "z": 10.0,
+                    "px": 0.0,
+                    "py": 1.0,
+                    "pz": 1.0,
+                    "t": 1.0,
+                    "eDep": 0.1,
+                    "trackl": 1.0,
+                },
+                {
+                    "Event_ID": 1,
+                    "Track_ID": 2,
+                    "x": 10.0,
+                    "y": 30.0,
+                    "z": 20.0,
+                    "px": 0.0,
+                    "py": 1.0,
+                    "pz": 1.0,
+                    "t": 2.0,
+                    "eDep": 0.1,
+                    "trackl": 1.0,
+                },
+            ]
+        ),
+        tmp_path / "TPC_output_0.parquet",
+    )
+    _write(
+        pd.DataFrame(
+            [
+                {"Event_ID": 1, "Track_ID": 101, "Name": "gamma", "x": 110.0, "y": 10.0, "z": 0.0, "eDep": 100.0},
+                {"Event_ID": 1, "Track_ID": 102, "Name": "gamma", "x": 10.0, "y": 110.0, "z": 0.0, "eDep": 100.0},
+            ]
+        ),
+        tmp_path / "LeadGlass_output_0.parquet",
+    )
+
+    result = reconstruct_run(tmp_path, 0)
+    photons = result["photons"].sort_values("source_track_id").reset_index(drop=True)
+    pi0 = result["pi0"].iloc[0]
+
+    assert photons.loc[0, "vertex_x"] == pytest.approx(10.0)
+    assert photons.loc[0, "vertex_y"] == pytest.approx(10.0)
+    assert photons.loc[0, "ux"] == pytest.approx(1.0)
+    assert photons.loc[0, "uy"] == pytest.approx(0.0)
+    assert photons.loc[1, "ux"] == pytest.approx(0.0)
+    assert photons.loc[1, "uy"] == pytest.approx(1.0)
+    assert pi0["opening_angle_deg"] == pytest.approx(90.0)
+    assert pi0["mass"] == pytest.approx(141.4213562373095)
 
 
 def test_reconstruct_run_writes_expected_tables(tmp_path: Path) -> None:

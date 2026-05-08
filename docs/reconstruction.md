@@ -23,8 +23,10 @@ macOS `._*.parquet` sidecar files are ignored.
 - event vertices from the Chapter 7 TPC track-projection method onto the
   source-foil plane (`z=0`)
 - preliminary charged pion/proton PID from TPC dE/dx plus scintillator range
-- photon-like neutral objects from lead-glass energy deposits
-- pi0 candidates from photon pairs
+- photon-like neutral objects from lead-glass energy deposits, with shower
+  centroids and vertex-relative directions when a reconstructed event vertex is
+  available
+- pi0 candidates from photon pairs using those reconstructed photon directions
 - event variables: calorimeter energy, object multiplicities, pion multiplicity,
   PMT photon counts, visible invariant mass, upper/lower scintillator and
   lead-glass energy, signed longitudinal calorimeter energy, transverse
@@ -53,6 +55,14 @@ lead-glass hits and then combined for the full calorimeter.
 The vertex table reports the mean of valid per-track projections to `z=0`, the
 RMS radial spread of those projections, and the number of skipped tracks whose
 TPC entry/exit points were insufficient or parallel to the foil plane.
+
+Photon-like objects report the energy-weighted lead-glass shower centroid, the
+vertex used for the neutral flight direction, and the corresponding path length.
+When a reconstructed event vertex exists, the photon unit vector is computed from
+`vertex -> shower centroid`; otherwise the package falls back to the historical
+origin-to-centroid direction. This keeps pi0 masses and event-shape variables
+consistent with the reconstructed interaction point instead of implicitly
+assuming a source at `(0,0,0)`.
 
 The timing-window columns use the Chapter 7 formulas after a vertex and event
 time are available. Scintillator hits are accepted between the flight time of a
