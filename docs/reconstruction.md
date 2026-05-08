@@ -98,6 +98,7 @@ python3 -m nnbar_reconstruction.cli scan-pid build-codex-setup2/output --all-run
 python3 -m nnbar_reconstruction.cli validate-reco build-codex-setup2/output --run 0 --json reco_validation.json
 python3 -m nnbar_reconstruction.cli validate-reco build-codex-setup2/output --runs 0,1,2 --json reco_validation.json
 python3 -m nnbar_reconstruction.cli validate-reco build-codex-setup2/output --all-runs --json reco_validation.json
+python3 -m nnbar_reconstruction.cli validate-reco build-codex-setup2/output --all-runs --min-class-count 100 --min-accuracy 0.95 --min-balanced-f1 0.95
 ```
 
 The CSV tables are intended as the handoff surface for plotting, cut-flow
@@ -119,4 +120,6 @@ charged/neutral matching. Each metric includes a `usable` flag so single-class
 or unlabeled samples are not treated as complete validation evidence. For
 multi-run validation through `--runs` or `--all-runs`, the JSON includes both
 per-run reports and an `aggregate` report computed after combining reconstructed
-tables across the requested runs.
+tables across the requested runs. The optional readiness gate flags
+`--min-class-count`, `--min-accuracy`, and `--min-balanced-f1` add a
+machine-checkable `readiness` block with exact failed requirements.

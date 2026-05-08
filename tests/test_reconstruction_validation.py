@@ -5,7 +5,7 @@ import pandas as pd
 
 from nnbar_reconstruction.cli import main
 from nnbar_reconstruction.reconstruction import reconstruct_run
-from nnbar_reconstruction.validation import evaluate_reconstruction_truth
+from nnbar_reconstruction.validation import assess_validation_readiness, evaluate_reconstruction_truth
 
 
 def _write(df: pd.DataFrame, path: Path) -> None:
@@ -220,3 +220,43 @@ def test_cli_validate_reco_can_discover_all_runs(tmp_path: Path, capsys) -> None
     assert exit_code == 0
     assert payload["runs"] == [0, 1]
     assert payload["aggregate"]["overall_usable"]
+
+
+def test_validation_readiness_gate_reports_missing_class_counts(tmp_path: Path) -> None:
+    _single_class_validation_fixture(tmp_path)
+
+    report = evaluate_reconstruction_truth(reconstruct_run(tmp_path, 0))
+    readiness = assess_validation_readiness(
+        report,
+        min_class_count=2,
+        min_accuracy=0.9,
+        min_balanced_f1=0.9,
+    )
+
+    assert not readiness["passed"]
+    assert "charged_pid.true_proton 0 < 2" in readiness["failed_requirements"]
+    assert "photon_charged_match.true_neutral 0 < 2" in readiness["failed_requirements"]
+
+
+def test_cli_validate_reco_emits_thresholded_readiness(tmp_path: Path, capsys) -> None:
+    _validation_fixture(tmp_path)
+
+    exit_code = main(
+        [
+            "validate-reco",
+            str(tmp_path),
+            "--run",
+            "0",
+            "--min-class-count",
+            "1",
+            "--min-accuracy",
+            "0.9",
+            "--min-balanced-f1",
+            "0.9",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["readiness"]["passed"]
+    assert payload["readiness"]["failed_requirements"] == []

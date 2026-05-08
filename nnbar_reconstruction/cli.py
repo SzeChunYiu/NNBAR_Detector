@@ -11,7 +11,11 @@ import pandas as pd
 from .calibration import scan_charged_pid_thresholds
 from .io import discover_runs, load_run
 from .reconstruction import reconstruct_run
-from .validation import aggregate_reconstruction_truth, evaluate_reconstruction_truth
+from .validation import (
+    aggregate_reconstruction_truth,
+    assess_validation_readiness,
+    evaluate_reconstruction_truth,
+)
 
 
 def _write_tables(result: dict, output_dir: Path) -> None:
@@ -179,18 +183,32 @@ def validate_reco(args: argparse.Namespace) -> int:
         reports.append(report)
 
     if len(reports) == 1:
+        readiness = assess_validation_readiness(
+            reports[0],
+            min_class_count=args.min_class_count,
+            min_accuracy=args.min_accuracy,
+            min_balanced_f1=args.min_balanced_f1,
+        )
         summary = {
             "run": runs[0],
             "runs": runs,
             **reports[0],
+            "readiness": readiness,
         }
     else:
         aggregate = aggregate_reconstruction_truth(results)
+        readiness = assess_validation_readiness(
+            aggregate,
+            min_class_count=args.min_class_count,
+            min_accuracy=args.min_accuracy,
+            min_balanced_f1=args.min_balanced_f1,
+        )
         summary = {
             "run": None,
             "runs": runs,
             "overall_usable": bool(aggregate["overall_usable"]),
             "aggregate": aggregate,
+            "readiness": readiness,
             "run_reports": reports,
         }
     payload = json.dumps(summary, indent=2, sort_keys=True)
@@ -245,6 +263,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_validate.add_argument("--run", type=int, default=0, help="Run number to validate")
     p_validate.add_argument("--runs", type=_int_grid, help="Comma-separated run numbers to validate")
     p_validate.add_argument("--all-runs", action="store_true", help="Discover and validate all available runs")
+    p_validate.add_argument("--min-class-count", type=int, default=1, help="Minimum truth count per validation class")
+    p_validate.add_argument("--min-accuracy", type=float, default=0.0, help="Minimum accuracy required per metric")
+    p_validate.add_argument("--min-balanced-f1", type=float, default=0.0, help="Minimum balanced F1 required per metric")
     p_validate.add_argument("--json", type=Path, help="Optional JSON validation report path")
     p_validate.set_defaults(func=validate_reco)
 
