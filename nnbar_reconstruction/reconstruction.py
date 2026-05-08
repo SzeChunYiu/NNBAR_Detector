@@ -130,6 +130,29 @@ def _span(points: pd.DataFrame) -> float:
     return float(np.sqrt(np.max(np.sum(deltas * deltas, axis=2))))
 
 
+def _track_direction_from_hits(group: pd.DataFrame) -> np.ndarray:
+    if {"x", "y", "z"}.issubset(group.columns):
+        working = group.copy()
+        working["_input_order"] = np.arange(len(working))
+        sort_cols = ["t", "_input_order"] if "t" in working else ["_input_order"]
+        coords = (
+            working.sort_values(sort_cols)[["x", "y", "z"]]
+            .apply(pd.to_numeric, errors="coerce")
+            .to_numpy(dtype=float)
+        )
+        coords = coords[np.isfinite(coords).all(axis=1)]
+        if len(coords) >= 2:
+            direction = _unit_vector(coords[-1] - coords[0])
+            if np.any(direction):
+                return direction
+
+    if {"px", "py", "pz"}.issubset(group.columns):
+        momentum = group[["px", "py", "pz"]].apply(pd.to_numeric, errors="coerce")
+        return _unit_vector(momentum.mean().to_numpy(dtype=float))
+
+    return np.zeros(3)
+
+
 def _directional_energy(df: pd.DataFrame) -> tuple[float, float]:
     """Return signed longitudinal and transverse energy about the beam z-axis."""
 
@@ -294,7 +317,7 @@ def reconstruct_charged_objects(
         path = _safe_sum(group, "trackl")
         edep = _safe_sum(group, "eDep")
         dedx = edep / path if path > 0 else np.nan
-        direction = _unit_vector(group[["px", "py", "pz"]].mean().to_numpy(dtype=float))
+        direction = _track_direction_from_hits(group)
 
         scint = pd.DataFrame()
         if not scintillator.empty:
