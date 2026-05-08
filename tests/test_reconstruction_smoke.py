@@ -272,6 +272,41 @@ def test_photon_directions_use_reconstructed_vertex_for_pi0_mass(tmp_path: Path)
     assert pi0["mass"] == pytest.approx(141.4213562373095)
 
 
+def test_photon_charged_match_uses_geometry_not_truth_track_id() -> None:
+    config = ReconstructionConfig(charged_cluster_match_angle_deg=5.0)
+    vertices = pd.DataFrame(
+        [
+            {
+                "event_id": 1,
+                "vertex_x": 0.0,
+                "vertex_y": 0.0,
+                "vertex_z": 0.0,
+            }
+        ]
+    )
+    tpc = pd.DataFrame(
+        [
+            {"Event_ID": 1, "Track_ID": 7, "x": 10.0, "y": 0.0, "z": 0.0, "t": 1.0},
+            {"Event_ID": 1, "Track_ID": 7, "x": 50.0, "y": 0.0, "z": 0.0, "t": 2.0},
+        ]
+    )
+    lead = pd.DataFrame(
+        [
+            {"Event_ID": 1, "Track_ID": 101, "Name": "pi+", "x": 100.0, "y": 1.0, "z": 0.0, "eDep": 100.0},
+            {"Event_ID": 1, "Track_ID": 7, "Name": "gamma", "x": 0.0, "y": 100.0, "z": 0.0, "eDep": 100.0},
+        ]
+    )
+
+    photons = reconstruct_photon_objects(lead, tpc=tpc, config=config, vertices=vertices)
+    by_source = photons.set_index("source_track_id")
+
+    assert bool(by_source.loc[101, "has_tpc_track"])
+    assert by_source.loc[101, "matched_tpc_track_id"] == 7
+    assert by_source.loc[101, "charged_match_angle_deg"] < 1.0
+    assert not bool(by_source.loc[7, "has_tpc_track"])
+    assert pd.isna(by_source.loc[7, "matched_tpc_track_id"])
+
+
 def test_reconstruct_run_writes_expected_tables(tmp_path: Path) -> None:
     _write(
         pd.DataFrame(
