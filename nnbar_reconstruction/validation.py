@@ -162,3 +162,43 @@ def aggregate_reconstruction_truth(results: list[dict[str, pd.DataFrame]]) -> di
         ]
         combined[key] = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
     return evaluate_reconstruction_truth(combined)
+
+
+def assess_validation_readiness(
+    report: dict[str, Any],
+    *,
+    min_class_count: int = 1,
+    min_accuracy: float = 0.0,
+    min_balanced_f1: float = 0.0,
+) -> dict[str, Any]:
+    """Check whether a validation report satisfies configurable evidence gates."""
+
+    checks = {
+        "charged_pid": ("true_proton", "true_pion"),
+        "photon_charged_match": ("true_charged", "true_neutral"),
+    }
+    failed: list[str] = []
+    for section, class_keys in checks.items():
+        metrics = report.get(section, {})
+        if not metrics.get("usable", False):
+            failed.append(f"{section}.usable is false")
+        for key in class_keys:
+            value = int(metrics.get(key, 0))
+            if value < min_class_count:
+                failed.append(f"{section}.{key} {value} < {min_class_count}")
+        accuracy = float(metrics.get("accuracy", 0.0))
+        if accuracy < min_accuracy:
+            failed.append(f"{section}.accuracy {accuracy:.6g} < {min_accuracy:.6g}")
+        balanced_f1 = float(metrics.get("balanced_f1", 0.0))
+        if balanced_f1 < min_balanced_f1:
+            failed.append(f"{section}.balanced_f1 {balanced_f1:.6g} < {min_balanced_f1:.6g}")
+
+    return {
+        "passed": not failed,
+        "failed_requirements": failed,
+        "requirements": {
+            "min_class_count": int(min_class_count),
+            "min_accuracy": float(min_accuracy),
+            "min_balanced_f1": float(min_balanced_f1),
+        },
+    }
