@@ -6,6 +6,8 @@ import argparse
 import json
 from pathlib import Path
 
+import pandas as pd
+
 from .calibration import scan_charged_pid_thresholds
 from .io import load_run
 from .reconstruction import reconstruct_run
@@ -88,11 +90,42 @@ def _float_grid(value: str) -> list[float]:
     return values
 
 
+def _int_grid(value: str) -> list[int]:
+    try:
+        values = [int(part.strip()) for part in value.split(",") if part.strip()]
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid integer grid: {value}") from exc
+    if not values:
+        raise argparse.ArgumentTypeError("grid must contain at least one value")
+    return values
+
+
+def _load_pid_scan_tables(output_dir: Path, runs: list[int]) -> tuple:
+    tpc_tables = []
+    scintillator_tables = []
+    for run in runs:
+        data = load_run(output_dir, run)
+        event_offset = int(run) * 1_000_000_000
+        tpc = data["TPC"].copy()
+        scintillator = data["Scintillator"].copy()
+        if not tpc.empty and "Event_ID" in tpc:
+            tpc["Event_ID"] = tpc["Event_ID"].astype(int) + event_offset
+        if not scintillator.empty and "Event_ID" in scintillator:
+            scintillator["Event_ID"] = scintillator["Event_ID"].astype(int) + event_offset
+        tpc_tables.append(tpc)
+        scintillator_tables.append(scintillator)
+    return (
+        pd.concat(tpc_tables, ignore_index=True) if tpc_tables else pd.DataFrame(),
+        pd.concat(scintillator_tables, ignore_index=True) if scintillator_tables else pd.DataFrame(),
+    )
+
+
 def scan_pid(args: argparse.Namespace) -> int:
-    data = load_run(args.output_dir, args.run)
+    runs = args.runs if args.runs is not None else [args.run]
+    tpc, scintillator = _load_pid_scan_tables(args.output_dir, runs)
     scan = scan_charged_pid_thresholds(
-        data["TPC"],
-        data["Scintillator"],
+        tpc,
+        scintillator,
         proton_dedx_values=args.proton_dedx,
         short_range_values=args.short_range,
         short_range_proton_dedx_values=args.short_range_dedx,
@@ -103,7 +136,8 @@ def scan_pid(args: argparse.Namespace) -> int:
 
     top = json.loads(scan.head(args.top).to_json(orient="records")) if not scan.empty else []
     summary = {
-        "run": args.run,
+        "run": runs[0] if len(runs) == 1 else None,
+        "runs": runs,
         "scanned_configs": int(len(scan)),
         "labeled_tracks": int(scan.iloc[0]["n_labeled_tracks"]) if not scan.empty else 0,
         "calibration_usable": bool(top[0]["has_both_classes"]) if top else False,
@@ -132,6 +166,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_scan_pid = sub.add_parser("scan-pid", help="Scan charged pion/proton PID thresholds against truth labels")
     p_scan_pid.add_argument("output_dir", type=Path, help="Directory containing *_output_<run>.parquet files")
     p_scan_pid.add_argument("--run", type=int, default=0, help="Run number to scan")
+    p_scan_pid.add_argument("--runs", type=_int_grid, help="Comma-separated run numbers to combine")
     p_scan_pid.add_argument(
         "--proton-dedx",
         type=_float_grid,
