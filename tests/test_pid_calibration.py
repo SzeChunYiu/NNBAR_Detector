@@ -122,6 +122,36 @@ def test_cli_scan_pid_can_combine_multiple_runs(tmp_path: Path, capsys) -> None:
     assert payload["best"]["true_proton"] == 2
 
 
+def test_cli_scan_pid_can_discover_all_runs(tmp_path: Path, capsys) -> None:
+    tpc, scint = _pid_scan_fixture()
+    _write(tpc[tpc["Track_ID"].isin([1, 2])], tmp_path / "TPC_output_0.parquet")
+    _write(scint[scint["Track_ID"].isin([1, 2])], tmp_path / "Scintillator_output_0.parquet")
+    _write(tpc[tpc["Track_ID"].isin([3, 4])], tmp_path / "TPC_output_1.parquet")
+    _write(scint[scint["Track_ID"].isin([3, 4])], tmp_path / "Scintillator_output_1.parquet")
+    (tmp_path / "._TPC_output_99.parquet").write_text("sidecar", encoding="utf-8")
+
+    exit_code = main(
+        [
+            "scan-pid",
+            str(tmp_path),
+            "--all-runs",
+            "--proton-dedx",
+            "4,8",
+            "--short-range",
+            "3,10",
+            "--short-range-dedx",
+            "4,6",
+            "--top",
+            "1",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["runs"] == [0, 1]
+    assert payload["calibration_usable"]
+
+
 def test_pid_threshold_scan_marks_single_class_samples_unusable() -> None:
     tpc = pd.DataFrame(
         [

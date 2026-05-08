@@ -208,3 +208,15 @@ def test_cli_validate_reco_aggregates_class_support_across_runs(tmp_path: Path, 
     assert payload["aggregate"]["charged_pid"]["true_proton"] == 1
     assert payload["aggregate"]["photon_charged_match"]["true_charged"] == 1
     assert payload["aggregate"]["photon_charged_match"]["true_neutral"] == 1
+
+
+def test_cli_validate_reco_can_discover_all_runs(tmp_path: Path, capsys) -> None:
+    _single_class_validation_fixture(tmp_path)
+    (tmp_path / "._LeadGlass_output_99.parquet").write_text("sidecar", encoding="utf-8")
+
+    exit_code = main(["validate-reco", str(tmp_path), "--all-runs"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["runs"] == [0, 1]
+    assert payload["aggregate"]["overall_usable"]
