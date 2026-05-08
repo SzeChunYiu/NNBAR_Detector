@@ -4,6 +4,8 @@ import pandas as pd
 
 from nnbar_reconstruction.io import discover_runs, load_run
 from nnbar_reconstruction.reconstruction import (
+    ReconstructionConfig,
+    annotate_timing_windows,
     reconstruct_electron_pair_objects,
     reconstruct_event_vertices,
     find_pi0_candidates,
@@ -112,6 +114,77 @@ def test_event_vertex_projects_tpc_tracks_back_to_source_foil() -> None:
     assert vertex["vertex_z"] == 0.0
     assert vertex["vertex_radial_spread"] == 0.0
     assert vertex["n_skipped_tracks"] == 1
+
+
+def test_timing_windows_filter_scintillator_and_leadglass_hits_from_vertex(tmp_path: Path) -> None:
+    config = ReconstructionConfig(
+        scintillator_time_resolution_ns=0.05,
+        leadglass_time_resolution_ns=0.05,
+    )
+    vertices = pd.DataFrame(
+        [
+            {
+                "event_id": 1,
+                "vertex_x": 0.0,
+                "vertex_y": 0.0,
+                "vertex_z": 0.0,
+                "vertex_time_ns": 0.0,
+            }
+        ]
+    )
+    scint = pd.DataFrame(
+        [
+            {"Event_ID": 1, "Track_ID": 1, "x": 0.0, "y": 0.0, "z": 29.9792458, "t": 1.10, "eDep": 30.0},
+            {"Event_ID": 1, "Track_ID": 2, "x": 0.0, "y": 0.0, "z": 29.9792458, "t": 1.50, "eDep": 70.0},
+        ]
+    )
+    lead = pd.DataFrame(
+        [
+            {"Event_ID": 1, "Track_ID": 11, "Name": "gamma", "x": 0.0, "y": 0.0, "z": 29.9792458, "t": 1.00, "eDep": 100.0},
+            {"Event_ID": 1, "Track_ID": 12, "Name": "gamma", "x": 0.0, "y": 0.0, "z": 29.9792458, "t": 1.25, "eDep": 200.0},
+        ]
+    )
+
+    annotated_scint = annotate_timing_windows(scint, vertices, "scintillator", config)
+    annotated_lead = annotate_timing_windows(lead, vertices, "leadglass", config)
+
+    assert annotated_scint["in_timing_window"].tolist() == [True, False]
+    assert annotated_lead["in_timing_window"].tolist() == [True, False]
+
+    _write(
+        pd.DataFrame(
+            [
+                {"Event_ID": 1, "Track_ID": 1, "x": 10.0, "y": 0.0, "z": 10.0, "t": 1.0},
+                {
+                    "Event_ID": 1,
+                    "Track_ID": 1,
+                    "Name": "pi+",
+                    "x": 20.0,
+                    "y": 0.0,
+                    "z": 20.0,
+                    "px": 1.0,
+                    "py": 0.0,
+                    "pz": 0.0,
+                    "t": 2.0,
+                    "eDep": 0.1,
+                    "trackl": 1.0,
+                },
+            ]
+        ),
+        tmp_path / "TPC_output_0.parquet",
+    )
+    _write(scint, tmp_path / "Scintillator_output_0.parquet")
+    _write(lead, tmp_path / "LeadGlass_output_0.parquet")
+
+    events = reconstruct_run(tmp_path, 0, config=config)["events"]
+    row = events.iloc[0]
+
+    assert row["vertex_time_ns"] == 0.0
+    assert row["scintillator_timing_edep"] == 30.0
+    assert row["scintillator_out_of_time_edep"] == 70.0
+    assert row["leadglass_timing_edep"] == 100.0
+    assert row["leadglass_out_of_time_edep"] == 200.0
+    assert row["calorimeter_timing_edep"] == 130.0
 
 
 def test_reconstruct_run_writes_expected_tables(tmp_path: Path) -> None:

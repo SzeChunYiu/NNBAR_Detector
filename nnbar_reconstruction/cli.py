@@ -52,6 +52,16 @@ def summarize(args: argparse.Namespace) -> int:
         "pi0_candidates": int(len(result["pi0"])),
         "selected_pi0": int(result["pi0"]["passes_selection"].sum()) if not result["pi0"].empty else 0,
         "total_calorimeter_edep": float(events["calorimeter_edep"].sum()) if not events.empty else 0.0,
+        "timing_calorimeter_edep": (
+            float(events["calorimeter_timing_edep"].sum())
+            if not events.empty and "calorimeter_timing_edep" in events
+            else 0.0
+        ),
+        "out_of_time_calorimeter_edep": (
+            float(events["calorimeter_out_of_time_edep"].sum())
+            if not events.empty and "calorimeter_out_of_time_edep" in events
+            else 0.0
+        ),
         "pmt_photons": int(events["pmt_photons"].sum()) if not events.empty and "pmt_photons" in events else 0,
         "pmt_hits": int(events["n_pmt_hits"].sum()) if not events.empty and "n_pmt_hits" in events else 0,
         "selected_events": int(events["passes_preliminary_selection"].sum()) if not events.empty else 0,

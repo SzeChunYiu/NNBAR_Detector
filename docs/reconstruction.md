@@ -28,7 +28,8 @@ macOS `._*.parquet` sidecar files are ignored.
 - event variables: calorimeter energy, object multiplicities, pion multiplicity,
   PMT photon counts, visible invariant mass, upper/lower scintillator and
   lead-glass energy, signed longitudinal calorimeter energy, transverse
-  calorimeter energy, and sphericity
+  calorimeter energy, Chapter 7 in-time/out-of-time calorimeter energy, and
+  sphericity
 - thesis-threshold preliminary event selection and cumulative cut-flow columns
 
 The pi0 defaults follow the thesis selection values available in Chapter 8:
@@ -52,6 +53,13 @@ lead-glass hits and then combined for the full calorimeter.
 The vertex table reports the mean of valid per-track projections to `z=0`, the
 RMS radial spread of those projections, and the number of skipped tracks whose
 TPC entry/exit points were insufficient or parallel to the foil plane.
+
+The timing-window columns use the Chapter 7 formulas after a vertex and event
+time are available. Scintillator hits are accepted between the flight time of a
+`1000 MeV` charged pion minus `2 sigma_scint` and a `100 MeV` charged pion plus
+`2 sigma_scint`; lead-glass hits are accepted within the photon flight time plus
+or minus `2 sigma_lg`. The resolution values are configurable because detector
+calibration constants are not fixed in this offline package.
 
 ## CLI
 
