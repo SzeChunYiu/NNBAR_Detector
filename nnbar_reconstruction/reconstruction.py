@@ -34,6 +34,8 @@ class ReconstructionConfig:
     pi0_leadglass_fraction_min: float = 0.55
     pi0_opening_angle_min_deg: float = 30.0
     charged_cluster_match_angle_deg: float = 8.0
+    charged_scintillator_match_angle_deg: float = 10.0
+    charged_scintillator_match_distance_cm: float = 15.0
     selection_scintillator_energy_min: float = 20.0
     selection_scintillator_energy_max: float = 2000.0
     selection_invariant_mass_min: float = 500.0
@@ -131,26 +133,94 @@ def _span(points: pd.DataFrame) -> float:
 
 
 def _track_direction_from_hits(group: pd.DataFrame) -> np.ndarray:
-    if {"x", "y", "z"}.issubset(group.columns):
-        working = group.copy()
-        working["_input_order"] = np.arange(len(working))
-        sort_cols = ["t", "_input_order"] if "t" in working else ["_input_order"]
-        coords = (
-            working.sort_values(sort_cols)[["x", "y", "z"]]
-            .apply(pd.to_numeric, errors="coerce")
-            .to_numpy(dtype=float)
-        )
-        coords = coords[np.isfinite(coords).all(axis=1)]
-        if len(coords) >= 2:
-            direction = _unit_vector(coords[-1] - coords[0])
-            if np.any(direction):
-                return direction
+    _, direction = _track_anchor_and_direction(group)
+    if np.any(direction):
+        return direction
 
     if {"px", "py", "pz"}.issubset(group.columns):
         momentum = group[["px", "py", "pz"]].apply(pd.to_numeric, errors="coerce")
         return _unit_vector(momentum.mean().to_numpy(dtype=float))
 
     return np.zeros(3)
+
+
+def _track_anchor_and_direction(group: pd.DataFrame) -> tuple[np.ndarray | None, np.ndarray]:
+    if not {"x", "y", "z"}.issubset(group.columns):
+        return None, np.zeros(3)
+
+    working = group.copy()
+    working["_input_order"] = np.arange(len(working))
+    sort_cols = ["t", "_input_order"] if "t" in working else ["_input_order"]
+    coords = (
+        working.sort_values(sort_cols)[["x", "y", "z"]]
+        .apply(pd.to_numeric, errors="coerce")
+        .to_numpy(dtype=float)
+    )
+    coords = coords[np.isfinite(coords).all(axis=1)]
+    if len(coords) < 2:
+        return None, np.zeros(3)
+
+    direction = _unit_vector(coords[-1] - coords[0])
+    if not np.any(direction):
+        return None, np.zeros(3)
+    return coords[0], direction
+
+
+def _position_coordinates(df: pd.DataFrame) -> np.ndarray:
+    particle_cols = {"particle_x", "particle_y", "particle_z"}
+    hit_cols = {"x", "y", "z"}
+    if particle_cols.issubset(df.columns):
+        cols = ["particle_x", "particle_y", "particle_z"]
+    elif hit_cols.issubset(df.columns):
+        cols = ["x", "y", "z"]
+    else:
+        return np.empty((0, 3), dtype=float)
+    return df[cols].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+
+
+def _select_scintillator_hits_for_track(
+    scintillator: pd.DataFrame,
+    event_id: Any,
+    track_id: Any,
+    tpc_track: pd.DataFrame,
+    config: ReconstructionConfig,
+) -> pd.DataFrame:
+    if scintillator.empty:
+        return pd.DataFrame()
+
+    event_hits = (
+        scintillator[scintillator["Event_ID"] == event_id]
+        if "Event_ID" in scintillator.columns
+        else scintillator
+    )
+    if event_hits.empty:
+        return event_hits
+
+    anchor, direction = _track_anchor_and_direction(tpc_track)
+    hit_coords = _position_coordinates(event_hits)
+    if anchor is not None and np.any(direction) and len(hit_coords) == len(event_hits):
+        valid = np.isfinite(hit_coords).all(axis=1)
+        vectors = hit_coords - anchor
+        projections = vectors @ direction
+        distances = np.linalg.norm(vectors - projections[:, None] * direction, axis=1)
+        angles = np.array([_angle_between_deg(vector, direction) for vector in vectors], dtype=float)
+        matched = (
+            valid
+            & np.isfinite(projections)
+            & (projections >= 0.0)
+            & np.isfinite(distances)
+            & (distances <= config.charged_scintillator_match_distance_cm)
+            & np.isfinite(angles)
+            & (angles <= config.charged_scintillator_match_angle_deg)
+        )
+        return event_hits.loc[matched].copy()
+
+    if {"Event_ID", "Track_ID"}.issubset(scintillator.columns):
+        return scintillator[
+            (scintillator["Event_ID"] == event_id)
+            & (scintillator["Track_ID"] == track_id)
+        ].copy()
+    return pd.DataFrame()
 
 
 def _directional_energy(df: pd.DataFrame) -> tuple[float, float]:
@@ -299,6 +369,7 @@ def reconstruct_charged_objects(
         "tpc_path",
         "dedx",
         "scintillator_edep",
+        "n_scintillator_hits",
         "scintillator_range",
         "px",
         "py",
@@ -319,12 +390,7 @@ def reconstruct_charged_objects(
         dedx = edep / path if path > 0 else np.nan
         direction = _track_direction_from_hits(group)
 
-        scint = pd.DataFrame()
-        if not scintillator.empty:
-            scint = scintillator[
-                (scintillator["Event_ID"] == event_id)
-                & (scintillator["Track_ID"] == track_id)
-            ]
+        scint = _select_scintillator_hits_for_track(scintillator, event_id, track_id, group, config)
         scint_edep = _safe_sum(scint, "eDep")
         scint_range = _span(scint)
 
@@ -350,6 +416,7 @@ def reconstruct_charged_objects(
                 "tpc_path": path,
                 "dedx": dedx,
                 "scintillator_edep": scint_edep,
+                "n_scintillator_hits": int(len(scint)),
                 "scintillator_range": scint_range,
                 "px": direction[0],
                 "py": direction[1],

@@ -97,6 +97,52 @@ def test_charged_direction_uses_tpc_hit_geometry_before_momentum_columns() -> No
     assert row["pz"] == pytest.approx(0.0)
 
 
+def test_charged_scintillator_energy_uses_geometry_not_truth_track_id() -> None:
+    config = ReconstructionConfig(
+        charged_scintillator_match_angle_deg=5.0,
+        charged_scintillator_match_distance_cm=2.0,
+    )
+    tpc = pd.DataFrame(
+        [
+            {"Event_ID": 1, "Track_ID": 10, "Name": "pi+", "x": 0.0, "y": 0.0, "z": 0.0, "t": 1.0, "eDep": 0.2, "trackl": 1.0},
+            {"Event_ID": 1, "Track_ID": 10, "Name": "pi+", "x": 50.0, "y": 0.0, "z": 0.0, "t": 2.0, "eDep": 0.3, "trackl": 1.0},
+        ]
+    )
+    scint = pd.DataFrame(
+        [
+            {
+                "Event_ID": 1,
+                "Track_ID": 999,
+                "eDep": 11.0,
+                "x": 70.0,
+                "y": 1.0,
+                "z": 0.0,
+                "particle_x": 70.0,
+                "particle_y": 1.0,
+                "particle_z": 0.0,
+            },
+            {
+                "Event_ID": 1,
+                "Track_ID": 10,
+                "eDep": 100.0,
+                "x": 0.0,
+                "y": 70.0,
+                "z": 0.0,
+                "particle_x": 0.0,
+                "particle_y": 70.0,
+                "particle_z": 0.0,
+            },
+        ]
+    )
+
+    charged = reconstruct_charged_objects(tpc, scint, config)
+    row = charged.iloc[0]
+
+    assert row["scintillator_edep"] == 11.0
+    assert row["n_scintillator_hits"] == 1
+    assert row["scintillator_range"] == 0.0
+
+
 def test_pi0_candidate_uses_thesis_selection_cuts() -> None:
     lead = pd.DataFrame(
         [

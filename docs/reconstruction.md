@@ -50,6 +50,11 @@ surface rather than a calibrated final mass estimator.
 Charged-object directions are reconstructed from the ordered TPC hit positions
 when those coordinates are available. The simulation momentum columns are used
 only as a fallback for sparse tables without enough positional information.
+Scintillator energy and range for charged objects use the same reconstruction
+principle: scintillator hits are associated to a TPC track by a configurable
+track-ray angular and distance match when detector coordinates are available;
+exact simulation `Track_ID` matching is kept only as a fallback for sparse
+legacy tables.
 
 The longitudinal and transverse energy variables follow the Chapter 9 event-shape
 definitions using the detector z-axis as the beam axis: `EL = sum(E_i cos(alpha_i))`
