@@ -6,6 +6,8 @@ import argparse
 import json
 from pathlib import Path
 
+from .calibration import scan_charged_pid_thresholds
+from .io import load_run
 from .reconstruction import reconstruct_run
 
 
@@ -76,6 +78,46 @@ def summarize(args: argparse.Namespace) -> int:
     return 0
 
 
+def _float_grid(value: str) -> list[float]:
+    try:
+        values = [float(part.strip()) for part in value.split(",") if part.strip()]
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid float grid: {value}") from exc
+    if not values:
+        raise argparse.ArgumentTypeError("grid must contain at least one value")
+    return values
+
+
+def scan_pid(args: argparse.Namespace) -> int:
+    data = load_run(args.output_dir, args.run)
+    scan = scan_charged_pid_thresholds(
+        data["TPC"],
+        data["Scintillator"],
+        proton_dedx_values=args.proton_dedx,
+        short_range_values=args.short_range,
+        short_range_proton_dedx_values=args.short_range_dedx,
+    )
+    if args.table:
+        args.table.parent.mkdir(parents=True, exist_ok=True)
+        scan.to_csv(args.table, index=False)
+
+    top = json.loads(scan.head(args.top).to_json(orient="records")) if not scan.empty else []
+    summary = {
+        "run": args.run,
+        "scanned_configs": int(len(scan)),
+        "labeled_tracks": int(scan.iloc[0]["n_labeled_tracks"]) if not scan.empty else 0,
+        "calibration_usable": bool(top[0]["has_both_classes"]) if top else False,
+        "best": top[0] if top else None,
+        "top": top,
+    }
+    payload = json.dumps(summary, indent=2, sort_keys=True)
+    if args.json:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(payload + "\n", encoding="utf-8")
+    print(payload)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Reconstruct NNBAR detector Parquet outputs")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -86,6 +128,32 @@ def build_parser() -> argparse.ArgumentParser:
     p_summary.add_argument("--json", type=Path, help="Optional JSON summary output path")
     p_summary.add_argument("--tables-dir", type=Path, help="Optional directory for reconstructed CSV tables")
     p_summary.set_defaults(func=summarize)
+
+    p_scan_pid = sub.add_parser("scan-pid", help="Scan charged pion/proton PID thresholds against truth labels")
+    p_scan_pid.add_argument("output_dir", type=Path, help="Directory containing *_output_<run>.parquet files")
+    p_scan_pid.add_argument("--run", type=int, default=0, help="Run number to scan")
+    p_scan_pid.add_argument(
+        "--proton-dedx",
+        type=_float_grid,
+        default=_float_grid("4,5,6,7,8,9,10"),
+        help="Comma-separated proton dE/dx thresholds",
+    )
+    p_scan_pid.add_argument(
+        "--short-range",
+        type=_float_grid,
+        default=_float_grid("5,10,15,20,25,30"),
+        help="Comma-separated short scintillator range thresholds in cm",
+    )
+    p_scan_pid.add_argument(
+        "--short-range-dedx",
+        type=_float_grid,
+        default=_float_grid("3,4,5,6,7"),
+        help="Comma-separated short-range proton dE/dx thresholds",
+    )
+    p_scan_pid.add_argument("--top", type=int, default=5, help="Number of top configurations to print")
+    p_scan_pid.add_argument("--json", type=Path, help="Optional JSON summary output path")
+    p_scan_pid.add_argument("--table", type=Path, help="Optional CSV table for all scanned configurations")
+    p_scan_pid.set_defaults(func=scan_pid)
 
     return parser
 

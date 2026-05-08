@@ -92,7 +92,15 @@ calibration constants are not fixed in this offline package.
 ```bash
 python3 -m nnbar_reconstruction.cli summarize build-codex-setup2/output --run 0
 python3 -m nnbar_reconstruction.cli summarize build-codex-setup2/output --run 0 --tables-dir reconstruction_out
+python3 -m nnbar_reconstruction.cli scan-pid build-codex-setup2/output --run 0 --table pid_scan.csv
 ```
 
 The CSV tables are intended as the handoff surface for plotting, cut-flow
 studies, and future calibration-derived PID thresholds.
+
+The `scan-pid` command evaluates charged pion/proton PID thresholds against
+simulation truth labels carried through the output tables. It reports the best
+ranked threshold sets by balanced proton/pion F1 and can save the full scan table
+for calibration studies before updating the default reconstruction constants.
+The JSON includes `calibration_usable`; it is false when the scanned sample lacks
+either truth-labelled protons or truth-labelled charged pions.
