@@ -329,7 +329,11 @@ def reconstruct_electron_pair_objects(
 
     working = tpc.copy()
     working["_input_order"] = np.arange(len(working))
-    sort_cols = ["Event_ID", "Track_ID", "t", "_input_order"] if "t" in working else ["Event_ID", "Track_ID", "_input_order"]
+    sort_cols = (
+        ["Event_ID", "Track_ID", "t", "_input_order"]
+        if "t" in working
+        else ["Event_ID", "Track_ID", "_input_order"]
+    )
     first_hits = (
         working.sort_values(sort_cols)
         .groupby(["Event_ID", "Track_ID"], dropna=False, as_index=False)
@@ -387,6 +391,87 @@ def reconstruct_electron_pair_objects(
                 }
             )
             pair_id += 1
+
+    return pd.DataFrame(rows, columns=columns)
+
+
+def reconstruct_event_vertices(tpc: pd.DataFrame) -> pd.DataFrame:
+    """Project TPC track lines back to the source foil plane at z=0."""
+
+    columns = [
+        "event_id",
+        "vertex_x",
+        "vertex_y",
+        "vertex_z",
+        "vertex_radial_spread",
+        "n_projected_tracks",
+        "n_skipped_tracks",
+    ]
+    required = {"Event_ID", "Track_ID", "x", "y", "z"}
+    if tpc is None or tpc.empty or not required.issubset(tpc.columns):
+        return _empty(columns)
+
+    working = tpc.copy()
+    working["_input_order"] = np.arange(len(working))
+    sort_cols = (
+        ["Event_ID", "Track_ID", "t", "_input_order"]
+        if "t" in working
+        else ["Event_ID", "Track_ID", "_input_order"]
+    )
+
+    projected_rows: list[dict[str, Any]] = []
+    skipped_by_event: dict[int, int] = {}
+    for (event_id, track_id), group in working.sort_values(sort_cols).groupby(["Event_ID", "Track_ID"], dropna=False):
+        event_key = int(event_id)
+        coords = group[["x", "y", "z"]].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+        coords = coords[np.isfinite(coords).all(axis=1)]
+        if len(coords) < 2:
+            skipped_by_event[event_key] = skipped_by_event.get(event_key, 0) + 1
+            continue
+
+        start = coords[0]
+        stop = coords[-1]
+        direction = stop - start
+        if not np.isfinite(direction).all() or abs(direction[2]) < 1.0e-12:
+            skipped_by_event[event_key] = skipped_by_event.get(event_key, 0) + 1
+            continue
+
+        scale = -start[2] / direction[2]
+        vertex = start + scale * direction
+        if not np.isfinite(vertex).all():
+            skipped_by_event[event_key] = skipped_by_event.get(event_key, 0) + 1
+            continue
+
+        projected_rows.append(
+            {
+                "event_id": event_key,
+                "track_id": int(track_id),
+                "projected_x": float(vertex[0]),
+                "projected_y": float(vertex[1]),
+                "projected_z": 0.0,
+            }
+        )
+
+    if not projected_rows:
+        return _empty(columns)
+
+    projected = pd.DataFrame(projected_rows)
+    rows: list[dict[str, Any]] = []
+    for event_id, event_tracks in projected.groupby("event_id", dropna=False):
+        xy = event_tracks[["projected_x", "projected_y"]].to_numpy(dtype=float)
+        center = np.mean(xy, axis=0)
+        spread = float(np.sqrt(np.mean(np.sum((xy - center) ** 2, axis=1)))) if len(xy) else float("nan")
+        rows.append(
+            {
+                "event_id": int(event_id),
+                "vertex_x": float(center[0]),
+                "vertex_y": float(center[1]),
+                "vertex_z": 0.0,
+                "vertex_radial_spread": spread,
+                "n_projected_tracks": int(len(event_tracks)),
+                "n_skipped_tracks": int(skipped_by_event.get(int(event_id), 0)),
+            }
+        )
 
     return pd.DataFrame(rows, columns=columns)
 
@@ -526,6 +611,7 @@ def summarize_events(
     photons: pd.DataFrame,
     pi0: pd.DataFrame,
     electron_pairs: pd.DataFrame | None = None,
+    vertices: pd.DataFrame | None = None,
     config: ReconstructionConfig = DEFAULT_CONFIG,
 ) -> pd.DataFrame:
     """Create per-event variables used by the preliminary selection."""
@@ -538,6 +624,8 @@ def summarize_events(
     event_ids.update(photons["event_id"].dropna().astype(int).tolist() if not photons.empty else [])
     if electron_pairs is not None and not electron_pairs.empty:
         event_ids.update(electron_pairs["event_id"].dropna().astype(int).tolist())
+    if vertices is not None and not vertices.empty:
+        event_ids.update(vertices["event_id"].dropna().astype(int).tolist())
 
     rows: list[dict[str, Any]] = []
     for event_id in sorted(event_ids):
@@ -567,6 +655,13 @@ def summarize_events(
             if electron_pairs is not None and not electron_pairs.empty
             else pd.DataFrame()
         )
+        vertex = (
+            vertices[vertices["event_id"] == event_id].iloc[0].to_dict()
+            if vertices is not None
+            and not vertices.empty
+            and not vertices[vertices["event_id"] == event_id].empty
+            else {}
+        )
         charged_pion_count = int((cands["pid_guess"] == "charged_pion").sum()) if not cands.empty else 0
 
         vectors: list[np.ndarray] = []
@@ -580,6 +675,11 @@ def summarize_events(
         event_row = {
             "event_id": event_id,
             "tpc_edep": tpc_e,
+            "vertex_x": vertex.get("vertex_x", float("nan")),
+            "vertex_y": vertex.get("vertex_y", float("nan")),
+            "vertex_z": vertex.get("vertex_z", float("nan")),
+            "vertex_radial_spread": vertex.get("vertex_radial_spread", float("nan")),
+            "n_vertex_tracks": int(vertex.get("n_projected_tracks", 0)),
             "scintillator_edep": scint_e,
             "upper_scintillator_edep": upper_scint_e,
             "lower_scintillator_edep": lower_scint_e,
@@ -623,12 +723,14 @@ def reconstruct_run(
     data = load_run(output_dir, run)
     charged = reconstruct_charged_objects(data["TPC"], data["Scintillator"], config)
     electron_pairs = reconstruct_electron_pair_objects(data["TPC"], config)
+    vertices = reconstruct_event_vertices(data["TPC"])
     photons = reconstruct_photon_objects(data["LeadGlass"], data["Scintillator"], data["TPC"], config)
     pi0 = find_pi0_candidates(photons, config)
-    events = summarize_events(data, charged, photons, pi0, electron_pairs, config)
+    events = summarize_events(data, charged, photons, pi0, electron_pairs, vertices, config)
     return {
         "charged": charged,
         "electron_pairs": electron_pairs,
+        "vertices": vertices,
         "photons": photons,
         "pi0": pi0,
         "events": events,

@@ -47,6 +47,7 @@ def summarize(args: argparse.Namespace) -> int:
         "events": int(len(events)),
         "charged_objects": int(len(result["charged"])),
         "electron_pair_candidates": int(len(result["electron_pairs"])),
+        "reconstructed_vertices": int(len(result["vertices"])),
         "photon_like_objects": int(len(result["photons"])),
         "pi0_candidates": int(len(result["pi0"])),
         "selected_pi0": int(result["pi0"]["passes_selection"].sum()) if not result["pi0"].empty else 0,
