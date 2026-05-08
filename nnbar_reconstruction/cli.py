@@ -11,6 +11,7 @@ import pandas as pd
 from .calibration import scan_charged_pid_thresholds
 from .io import load_run
 from .reconstruction import reconstruct_run
+from .validation import evaluate_reconstruction_truth
 
 
 def _write_tables(result: dict, output_dir: Path) -> None:
@@ -152,6 +153,38 @@ def scan_pid(args: argparse.Namespace) -> int:
     return 0
 
 
+def validate_reco(args: argparse.Namespace) -> int:
+    runs = args.runs if args.runs is not None else [args.run]
+    reports = []
+    overall_usable = True
+    for run in runs:
+        result = reconstruct_run(args.output_dir, run=run)
+        report = evaluate_reconstruction_truth(result)
+        report["run"] = run
+        reports.append(report)
+        overall_usable = overall_usable and bool(report["overall_usable"])
+
+    if len(reports) == 1:
+        summary = {
+            "run": runs[0],
+            "runs": runs,
+            **reports[0],
+        }
+    else:
+        summary = {
+            "run": None,
+            "runs": runs,
+            "overall_usable": bool(overall_usable),
+            "run_reports": reports,
+        }
+    payload = json.dumps(summary, indent=2, sort_keys=True)
+    if args.json:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(payload + "\n", encoding="utf-8")
+    print(payload)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Reconstruct NNBAR detector Parquet outputs")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -189,6 +222,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_scan_pid.add_argument("--json", type=Path, help="Optional JSON summary output path")
     p_scan_pid.add_argument("--table", type=Path, help="Optional CSV table for all scanned configurations")
     p_scan_pid.set_defaults(func=scan_pid)
+
+    p_validate = sub.add_parser("validate-reco", help="Evaluate reconstructed tables against truth labels")
+    p_validate.add_argument("output_dir", type=Path, help="Directory containing *_output_<run>.parquet files")
+    p_validate.add_argument("--run", type=int, default=0, help="Run number to validate")
+    p_validate.add_argument("--runs", type=_int_grid, help="Comma-separated run numbers to validate")
+    p_validate.add_argument("--json", type=Path, help="Optional JSON validation report path")
+    p_validate.set_defaults(func=validate_reco)
 
     return parser
 
