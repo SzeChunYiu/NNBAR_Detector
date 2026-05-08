@@ -87,16 +87,27 @@ def _unit_vector(values: np.ndarray) -> np.ndarray:
     return values / norm
 
 
-def _weighted_direction(group: pd.DataFrame, energy_col: str = "eDep") -> np.ndarray:
-    points = group[["x", "y", "z"]].to_numpy(dtype=float, copy=False)
-    if points.size == 0:
+def _weighted_centroid(group: pd.DataFrame, energy_col: str = "eDep") -> np.ndarray:
+    if group.empty or not {"x", "y", "z"}.issubset(group.columns):
         return np.zeros(3)
-    weights = pd.to_numeric(group.get(energy_col, 1.0), errors="coerce").fillna(0.0).to_numpy()
-    if np.sum(weights) <= 0:
-        centroid = np.mean(points, axis=0)
+
+    points = group[["x", "y", "z"]].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+    valid_points = np.isfinite(points).all(axis=1)
+    if not np.any(valid_points):
+        return np.zeros(3)
+
+    points = points[valid_points]
+    if energy_col in group.columns:
+        weights = pd.to_numeric(group[energy_col], errors="coerce").to_numpy(dtype=float)[valid_points]
     else:
-        centroid = np.average(points, axis=0, weights=weights)
-    return _unit_vector(centroid)
+        weights = np.ones(len(points), dtype=float)
+    valid_weights = np.isfinite(weights) & (weights > 0.0)
+
+    if np.any(valid_weights):
+        centroid = np.average(points[valid_weights], axis=0, weights=weights[valid_weights])
+    else:
+        centroid = np.mean(points, axis=0)
+    return centroid
 
 
 def _span(points: pd.DataFrame) -> float:
@@ -323,6 +334,7 @@ def reconstruct_photon_objects(
     scintillator: pd.DataFrame | None = None,
     tpc: pd.DataFrame | None = None,
     config: ReconstructionConfig = DEFAULT_CONFIG,
+    vertices: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Reconstruct neutral photon-like objects from calorimeter deposits."""
 
@@ -335,6 +347,14 @@ def reconstruct_photon_objects(
         "scintillator_edep",
         "total_energy",
         "leadglass_fraction",
+        "cluster_x",
+        "cluster_y",
+        "cluster_z",
+        "vertex_x",
+        "vertex_y",
+        "vertex_z",
+        "photon_path_length_cm",
+        "used_reconstructed_vertex",
         "ux",
         "uy",
         "uz",
@@ -348,6 +368,17 @@ def reconstruct_photon_objects(
     tpc_keys = set()
     if not tpc.empty:
         tpc_keys = set(zip(tpc["Event_ID"].astype(int), tpc["Track_ID"].astype(int)))
+
+    vertices = vertices if vertices is not None else pd.DataFrame()
+    vertex_lookup: dict[int, np.ndarray] = {}
+    if not vertices.empty and {"event_id", "vertex_x", "vertex_y", "vertex_z"}.issubset(vertices.columns):
+        for _, vertex_row in vertices.drop_duplicates("event_id").iterrows():
+            vertex = np.array(
+                [vertex_row.vertex_x, vertex_row.vertex_y, vertex_row.vertex_z],
+                dtype=float,
+            )
+            if np.isfinite(vertex).all():
+                vertex_lookup[int(vertex_row.event_id)] = vertex
 
     rows: list[dict[str, Any]] = []
     for object_id, ((event_id, track_id), group) in enumerate(
@@ -364,7 +395,12 @@ def reconstruct_photon_objects(
             ]
         scint_edep = _safe_sum(scint, "eDep")
         total = lead_edep + scint_edep
-        direction = _weighted_direction(group)
+        cluster = _weighted_centroid(group)
+        event_key = int(event_id)
+        has_vertex = event_key in vertex_lookup
+        vertex = vertex_lookup.get(event_key, np.zeros(3, dtype=float))
+        direction = _unit_vector(cluster - vertex)
+        path_length = float(np.linalg.norm(cluster - vertex))
         has_tpc = (int(event_id), int(track_id)) in tpc_keys
 
         rows.append(
@@ -377,6 +413,14 @@ def reconstruct_photon_objects(
                 "scintillator_edep": scint_edep,
                 "total_energy": total,
                 "leadglass_fraction": lead_edep / total if total > 0 else 0.0,
+                "cluster_x": float(cluster[0]),
+                "cluster_y": float(cluster[1]),
+                "cluster_z": float(cluster[2]),
+                "vertex_x": float(vertex[0]),
+                "vertex_y": float(vertex[1]),
+                "vertex_z": float(vertex[2]),
+                "photon_path_length_cm": path_length,
+                "used_reconstructed_vertex": bool(has_vertex),
                 "ux": direction[0],
                 "uy": direction[1],
                 "uz": direction[2],
@@ -857,7 +901,13 @@ def reconstruct_run(
     charged = reconstruct_charged_objects(data["TPC"], data["Scintillator"], config)
     electron_pairs = reconstruct_electron_pair_objects(data["TPC"], config)
     vertices = reconstruct_event_vertices(data["TPC"])
-    photons = reconstruct_photon_objects(data["LeadGlass"], data["Scintillator"], data["TPC"], config)
+    photons = reconstruct_photon_objects(
+        data["LeadGlass"],
+        data["Scintillator"],
+        data["TPC"],
+        config=config,
+        vertices=vertices,
+    )
     pi0 = find_pi0_candidates(photons, config)
     events = summarize_events(data, charged, photons, pi0, electron_pairs, vertices, config)
     return {
