@@ -33,6 +33,7 @@ class ReconstructionConfig:
     pi0_leadglass_energy_max: float = 980.0
     pi0_leadglass_fraction_min: float = 0.55
     pi0_opening_angle_min_deg: float = 30.0
+    charged_cluster_match_angle_deg: float = 8.0
     selection_scintillator_energy_min: float = 20.0
     selection_scintillator_energy_max: float = 2000.0
     selection_invariant_mass_min: float = 500.0
@@ -108,6 +109,15 @@ def _weighted_centroid(group: pd.DataFrame, energy_col: str = "eDep") -> np.ndar
     else:
         centroid = np.mean(points, axis=0)
     return centroid
+
+
+def _angle_between_deg(a: np.ndarray, b: np.ndarray) -> float:
+    a_unit = _unit_vector(a)
+    b_unit = _unit_vector(b)
+    if not np.any(a_unit) or not np.any(b_unit):
+        return float("nan")
+    cosang = float(np.clip(np.dot(a_unit, b_unit), -1.0, 1.0))
+    return float(np.degrees(np.arccos(cosang)))
 
 
 def _span(points: pd.DataFrame) -> float:
@@ -358,6 +368,8 @@ def reconstruct_photon_objects(
         "ux",
         "uy",
         "uz",
+        "matched_tpc_track_id",
+        "charged_match_angle_deg",
         "has_tpc_track",
     ]
     if leadglass is None or leadglass.empty:
@@ -365,9 +377,6 @@ def reconstruct_photon_objects(
 
     scintillator = scintillator if scintillator is not None else pd.DataFrame()
     tpc = tpc if tpc is not None else pd.DataFrame()
-    tpc_keys = set()
-    if not tpc.empty:
-        tpc_keys = set(zip(tpc["Event_ID"].astype(int), tpc["Track_ID"].astype(int)))
 
     vertices = vertices if vertices is not None else pd.DataFrame()
     vertex_lookup: dict[int, np.ndarray] = {}
@@ -379,6 +388,35 @@ def reconstruct_photon_objects(
             )
             if np.isfinite(vertex).all():
                 vertex_lookup[int(vertex_row.event_id)] = vertex
+
+    track_directions: dict[int, list[tuple[int, np.ndarray]]] = {}
+    if not tpc.empty and {"Event_ID", "Track_ID", "x", "y", "z"}.issubset(tpc.columns):
+        working = tpc.copy()
+        working["_input_order"] = np.arange(len(working))
+        sort_cols = (
+            ["Event_ID", "Track_ID", "t", "_input_order"]
+            if "t" in working
+            else ["Event_ID", "Track_ID", "_input_order"]
+        )
+        for (track_event_id, track_id), track_hits in working.sort_values(sort_cols).groupby(
+            ["Event_ID", "Track_ID"],
+            dropna=False,
+        ):
+            coords = track_hits[["x", "y", "z"]].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+            coords = coords[np.isfinite(coords).all(axis=1)]
+            if len(coords) < 2:
+                continue
+            event_key = int(track_event_id)
+            vertex = vertex_lookup.get(event_key, np.zeros(3, dtype=float))
+            distances = np.linalg.norm(coords - vertex, axis=1)
+            if not np.isfinite(distances).any():
+                continue
+            endpoint = coords[int(np.nanargmax(distances))]
+            direction = _unit_vector(endpoint - vertex)
+            if not np.any(direction):
+                direction = _unit_vector(coords[-1] - coords[0])
+            if np.any(direction):
+                track_directions.setdefault(event_key, []).append((int(track_id), direction))
 
     rows: list[dict[str, Any]] = []
     for object_id, ((event_id, track_id), group) in enumerate(
@@ -401,7 +439,19 @@ def reconstruct_photon_objects(
         vertex = vertex_lookup.get(event_key, np.zeros(3, dtype=float))
         direction = _unit_vector(cluster - vertex)
         path_length = float(np.linalg.norm(cluster - vertex))
-        has_tpc = (int(event_id), int(track_id)) in tpc_keys
+        best_track_id = float("nan")
+        best_angle = float("nan")
+        for candidate_track_id, track_direction in track_directions.get(event_key, []):
+            angle = _angle_between_deg(direction, track_direction)
+            if not np.isfinite(angle):
+                continue
+            if not np.isfinite(best_angle) or angle < best_angle:
+                best_angle = angle
+                best_track_id = float(candidate_track_id)
+        has_tpc = bool(
+            np.isfinite(best_angle)
+            and best_angle <= config.charged_cluster_match_angle_deg
+        )
 
         rows.append(
             {
@@ -424,6 +474,8 @@ def reconstruct_photon_objects(
                 "ux": direction[0],
                 "uy": direction[1],
                 "uz": direction[2],
+                "matched_tpc_track_id": int(best_track_id) if has_tpc else float("nan"),
+                "charged_match_angle_deg": best_angle,
                 "has_tpc_track": bool(has_tpc),
             }
         )

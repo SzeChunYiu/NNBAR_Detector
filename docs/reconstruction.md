@@ -64,6 +64,13 @@ origin-to-centroid direction. This keeps pi0 masses and event-shape variables
 consistent with the reconstructed interaction point instead of implicitly
 assuming a source at `(0,0,0)`.
 
+Charged-neutral separation for lead-glass clusters is geometric. TPC hits are
+grouped into reconstructed track candidates, each candidate direction is taken
+from the event vertex toward the farthest TPC hit, and a lead-glass cluster is
+tagged as charged only when its vertex-to-centroid direction falls inside the
+configurable matching cone. The simulation `Track_ID` remains available as
+provenance in `source_track_id`, but it is not the charged-cluster decision rule.
+
 The timing-window columns use the Chapter 7 formulas after a vertex and event
 time are available. Scintillator hits are accepted between the flight time of a
 `1000 MeV` charged pion minus `2 sigma_scint` and a `100 MeV` charged pion plus
