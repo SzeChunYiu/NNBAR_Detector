@@ -95,6 +95,7 @@ python3 -m nnbar_reconstruction.cli summarize build-codex-setup2/output --run 0 
 python3 -m nnbar_reconstruction.cli scan-pid build-codex-setup2/output --run 0 --table pid_scan.csv
 python3 -m nnbar_reconstruction.cli scan-pid build-codex-setup2/output --runs 0,1,2 --table pid_scan.csv
 python3 -m nnbar_reconstruction.cli validate-reco build-codex-setup2/output --run 0 --json reco_validation.json
+python3 -m nnbar_reconstruction.cli validate-reco build-codex-setup2/output --runs 0,1,2 --json reco_validation.json
 ```
 
 The CSV tables are intended as the handoff surface for plotting, cut-flow
@@ -112,4 +113,6 @@ internally so repeated run-local event and track ids do not collide.
 The `validate-reco` command reconstructs one or more runs and reports
 truth-supported validation metrics for charged pion/proton PID and lead-glass
 charged/neutral matching. Each metric includes a `usable` flag so single-class
-or unlabeled samples are not treated as complete validation evidence.
+or unlabeled samples are not treated as complete validation evidence. For
+multi-run validation, the JSON includes both per-run reports and an `aggregate`
+report computed after combining reconstructed tables across the requested runs.
