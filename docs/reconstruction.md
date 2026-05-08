@@ -20,6 +20,8 @@ macOS `._*.parquet` sidecar files are ignored.
 - charged-track candidates from TPC hits
 - electron/positron-pair candidates from the Chapter 8.2 TPC entry-point
   separation rule (`<=5 cm`)
+- event vertices from the Chapter 7 TPC track-projection method onto the
+  source-foil plane (`z=0`)
 - preliminary charged pion/proton PID from TPC dE/dx plus scintillator range
 - photon-like neutral objects from lead-glass energy deposits
 - pi0 candidates from photon pairs
@@ -46,6 +48,10 @@ The longitudinal and transverse energy variables follow the Chapter 9 event-shap
 definitions using the detector z-axis as the beam axis: `EL = sum(E_i cos(alpha_i))`
 and `ET = sum(E_i sin(alpha_i))`, evaluated separately for scintillator and
 lead-glass hits and then combined for the full calorimeter.
+
+The vertex table reports the mean of valid per-track projections to `z=0`, the
+RMS radial spread of those projections, and the number of skipped tracks whose
+TPC entry/exit points were insufficient or parallel to the foil plane.
 
 ## CLI
 

@@ -5,6 +5,7 @@ import pandas as pd
 from nnbar_reconstruction.io import discover_runs, load_run
 from nnbar_reconstruction.reconstruction import (
     reconstruct_electron_pair_objects,
+    reconstruct_event_vertices,
     find_pi0_candidates,
     reconstruct_charged_objects,
     reconstruct_photon_objects,
@@ -88,6 +89,31 @@ def test_electron_pair_candidates_use_tpc_entry_point_separation() -> None:
     assert bool(pair["has_opposite_charge_truth"])
 
 
+def test_event_vertex_projects_tpc_tracks_back_to_source_foil() -> None:
+    tpc = pd.DataFrame(
+        [
+            {"Event_ID": 1, "Track_ID": 1, "x": 10.0, "y": 0.0, "z": 10.0, "t": 1.0},
+            {"Event_ID": 1, "Track_ID": 1, "x": 20.0, "y": 0.0, "z": 20.0, "t": 2.0},
+            {"Event_ID": 1, "Track_ID": 2, "x": 0.0, "y": 20.0, "z": 20.0, "t": 1.0},
+            {"Event_ID": 1, "Track_ID": 2, "x": 0.0, "y": 30.0, "z": 30.0, "t": 2.0},
+            {"Event_ID": 1, "Track_ID": 3, "x": 9.0, "y": 9.0, "z": 10.0, "t": 1.0},
+            {"Event_ID": 1, "Track_ID": 3, "x": 19.0, "y": 9.0, "z": 10.0, "t": 2.0},
+        ]
+    )
+
+    vertices = reconstruct_event_vertices(tpc)
+
+    assert len(vertices) == 1
+    vertex = vertices.iloc[0]
+    assert vertex["event_id"] == 1
+    assert vertex["n_projected_tracks"] == 2
+    assert vertex["vertex_x"] == 0.0
+    assert vertex["vertex_y"] == 0.0
+    assert vertex["vertex_z"] == 0.0
+    assert vertex["vertex_radial_spread"] == 0.0
+    assert vertex["n_skipped_tracks"] == 1
+
+
 def test_reconstruct_run_writes_expected_tables(tmp_path: Path) -> None:
     _write(
         pd.DataFrame(
@@ -127,10 +153,11 @@ def test_reconstruct_run_writes_expected_tables(tmp_path: Path) -> None:
 
     result = reconstruct_run(tmp_path, 0)
 
-    assert set(result) == {"charged", "electron_pairs", "photons", "pi0", "events"}
+    assert set(result) == {"charged", "electron_pairs", "vertices", "photons", "pi0", "events"}
     assert result["events"].iloc[0]["pion_multiplicity"] == 2
     assert result["events"].iloc[0]["pmt_photons"] == 2
     assert result["events"].iloc[0]["n_pmt_hits"] == 2
+    assert "vertex_x" in result["events"].columns
 
 
 def test_preliminary_selection_uses_thesis_cutflow(tmp_path: Path) -> None:
