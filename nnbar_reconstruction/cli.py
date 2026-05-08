@@ -11,7 +11,7 @@ import pandas as pd
 from .calibration import scan_charged_pid_thresholds
 from .io import load_run
 from .reconstruction import reconstruct_run
-from .validation import evaluate_reconstruction_truth
+from .validation import aggregate_reconstruction_truth, evaluate_reconstruction_truth
 
 
 def _write_tables(result: dict, output_dir: Path) -> None:
@@ -156,13 +156,13 @@ def scan_pid(args: argparse.Namespace) -> int:
 def validate_reco(args: argparse.Namespace) -> int:
     runs = args.runs if args.runs is not None else [args.run]
     reports = []
-    overall_usable = True
+    results = []
     for run in runs:
         result = reconstruct_run(args.output_dir, run=run)
+        results.append(result)
         report = evaluate_reconstruction_truth(result)
         report["run"] = run
         reports.append(report)
-        overall_usable = overall_usable and bool(report["overall_usable"])
 
     if len(reports) == 1:
         summary = {
@@ -171,10 +171,12 @@ def validate_reco(args: argparse.Namespace) -> int:
             **reports[0],
         }
     else:
+        aggregate = aggregate_reconstruction_truth(results)
         summary = {
             "run": None,
             "runs": runs,
-            "overall_usable": bool(overall_usable),
+            "overall_usable": bool(aggregate["overall_usable"]),
+            "aggregate": aggregate,
             "run_reports": reports,
         }
     payload = json.dumps(summary, indent=2, sort_keys=True)

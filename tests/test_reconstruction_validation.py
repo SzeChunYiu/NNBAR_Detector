@@ -80,6 +80,87 @@ def _validation_fixture(output_dir: Path) -> None:
     )
 
 
+def _single_class_validation_fixture(output_dir: Path) -> None:
+    _write(
+        pd.DataFrame(
+            [
+                {
+                    "Event_ID": 1,
+                    "Track_ID": 10,
+                    "Name": "pi+",
+                    "Origin": "CarbonPV",
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0,
+                    "t": 1.0,
+                    "eDep": 0.5,
+                    "trackl": 1.0,
+                },
+                {
+                    "Event_ID": 1,
+                    "Track_ID": 10,
+                    "Name": "pi+",
+                    "Origin": "CarbonPV",
+                    "x": 50.0,
+                    "y": 0.0,
+                    "z": 0.0,
+                    "t": 2.0,
+                    "eDep": 0.5,
+                    "trackl": 1.0,
+                },
+            ]
+        ),
+        output_dir / "TPC_output_0.parquet",
+    )
+    _write(
+        pd.DataFrame(
+            [
+                {"Event_ID": 1, "Track_ID": 101, "Name": "pi+", "x": 100.0, "y": 0.0, "z": 0.0, "eDep": 100.0},
+            ]
+        ),
+        output_dir / "LeadGlass_output_0.parquet",
+    )
+    _write(
+        pd.DataFrame(
+            [
+                {
+                    "Event_ID": 1,
+                    "Track_ID": 20,
+                    "Name": "proton",
+                    "Origin": "CarbonPV",
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0,
+                    "t": 1.0,
+                    "eDep": 9.0,
+                    "trackl": 1.0,
+                },
+                {
+                    "Event_ID": 1,
+                    "Track_ID": 20,
+                    "Name": "proton",
+                    "Origin": "CarbonPV",
+                    "x": 0.0,
+                    "y": 50.0,
+                    "z": 0.0,
+                    "t": 2.0,
+                    "eDep": 9.0,
+                    "trackl": 1.0,
+                },
+            ]
+        ),
+        output_dir / "TPC_output_1.parquet",
+    )
+    _write(
+        pd.DataFrame(
+            [
+                {"Event_ID": 1, "Track_ID": 102, "Name": "gamma", "x": -100.0, "y": 0.0, "z": 0.0, "eDep": 100.0},
+            ]
+        ),
+        output_dir / "LeadGlass_output_1.parquet",
+    )
+
+
 def test_reconstruction_truth_validation_reports_supported_metrics(tmp_path: Path) -> None:
     _validation_fixture(tmp_path)
 
@@ -109,3 +190,21 @@ def test_cli_validate_reco_emits_json_report(tmp_path: Path, capsys) -> None:
     assert payload["overall_usable"]
     assert payload["charged_pid"]["accuracy"] == 1.0
     assert payload["photon_charged_match"]["accuracy"] == 1.0
+
+
+def test_cli_validate_reco_aggregates_class_support_across_runs(tmp_path: Path, capsys) -> None:
+    _single_class_validation_fixture(tmp_path)
+
+    exit_code = main(["validate-reco", str(tmp_path), "--runs", "0,1"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["run"] is None
+    assert payload["runs"] == [0, 1]
+    assert not payload["run_reports"][0]["overall_usable"]
+    assert not payload["run_reports"][1]["overall_usable"]
+    assert payload["aggregate"]["overall_usable"]
+    assert payload["aggregate"]["charged_pid"]["true_pion"] == 1
+    assert payload["aggregate"]["charged_pid"]["true_proton"] == 1
+    assert payload["aggregate"]["photon_charged_match"]["true_charged"] == 1
+    assert payload["aggregate"]["photon_charged_match"]["true_neutral"] == 1

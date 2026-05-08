@@ -144,3 +144,21 @@ def evaluate_reconstruction_truth(result: dict[str, pd.DataFrame]) -> dict[str, 
         "photon_charged_match": photon_report,
         "overall_usable": bool(charged_report["usable"] and photon_report["usable"]),
     }
+
+
+def aggregate_reconstruction_truth(results: list[dict[str, pd.DataFrame]]) -> dict[str, Any]:
+    """Evaluate validation metrics after combining reconstructed tables across runs."""
+
+    keys = set()
+    for result in results:
+        keys.update(result)
+
+    combined: dict[str, pd.DataFrame] = {}
+    for key in keys:
+        tables = [
+            result[key]
+            for result in results
+            if key in result and result[key] is not None and not result[key].empty
+        ]
+        combined[key] = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
+    return evaluate_reconstruction_truth(combined)
