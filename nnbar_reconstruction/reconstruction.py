@@ -40,6 +40,12 @@ class ReconstructionConfig:
     selection_upper_scintillator_max: float = 320.0
     selection_lower_scintillator_max: float = 930.0
     electron_pair_max_entry_separation_cm: float = 5.0
+    scintillator_time_resolution_ns: float = 1.0
+    leadglass_time_resolution_ns: float = 1.0
+    fast_pion_kinetic_energy_mev: float = 1000.0
+    slow_pion_kinetic_energy_mev: float = 100.0
+    charged_pion_mass_mev: float = 139.57039
+    speed_of_light_cm_per_ns: float = 29.9792458
 
 
 DEFAULT_CONFIG = ReconstructionConfig()
@@ -124,6 +130,100 @@ def _directional_energy(df: pd.DataFrame) -> tuple[float, float]:
     transverse_radius = np.linalg.norm(coords[:, :2], axis=1)
     transverse = float(np.sum(energy * transverse_radius / radius))
     return longitudinal, transverse
+
+
+def _beta_from_kinetic_energy(kinetic_energy_mev: float, mass_mev: float) -> float:
+    total_energy = kinetic_energy_mev + mass_mev
+    if total_energy <= mass_mev or mass_mev <= 0:
+        return 0.0
+    return float(np.sqrt(max(1.0 - (mass_mev / total_energy) ** 2, 0.0)))
+
+
+def _false_timing_annotation(hits: pd.DataFrame) -> pd.DataFrame:
+    annotated = hits.copy()
+    annotated["distance_to_vertex"] = float("nan")
+    annotated["timing_window_start_ns"] = float("nan")
+    annotated["timing_window_end_ns"] = float("nan")
+    annotated["in_timing_window"] = False
+    return annotated
+
+
+def annotate_timing_windows(
+    hits: pd.DataFrame,
+    vertices: pd.DataFrame,
+    detector: str,
+    config: ReconstructionConfig = DEFAULT_CONFIG,
+) -> pd.DataFrame:
+    """Annotate calorimeter hits with the Chapter 7 timing-window decision."""
+
+    required_hit_cols = {"Event_ID", "x", "y", "z", "t"}
+    required_vertex_cols = {"event_id", "vertex_x", "vertex_y", "vertex_z"}
+    if (
+        hits is None
+        or hits.empty
+        or vertices is None
+        or vertices.empty
+        or not required_hit_cols.issubset(hits.columns)
+        or not required_vertex_cols.issubset(vertices.columns)
+    ):
+        return _false_timing_annotation(hits if hits is not None else pd.DataFrame())
+
+    detector_key = detector.strip().lower()
+    if detector_key not in {"scintillator", "leadglass"}:
+        raise ValueError("detector must be 'scintillator' or 'leadglass'")
+
+    vertex_cols = ["event_id", "vertex_x", "vertex_y", "vertex_z"]
+    if "vertex_time_ns" in vertices.columns:
+        vertex_cols.append("vertex_time_ns")
+    vertex_frame = (
+        vertices[vertex_cols]
+        .drop_duplicates("event_id")
+        .rename(columns={"event_id": "Event_ID"})
+    )
+
+    merged = hits.merge(vertex_frame, on="Event_ID", how="left", sort=False)
+    coords = merged[["x", "y", "z"]].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+    vertex = merged[["vertex_x", "vertex_y", "vertex_z"]].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+    distance = np.linalg.norm(coords - vertex, axis=1)
+    hit_time = pd.to_numeric(merged["t"], errors="coerce").to_numpy(dtype=float)
+    if "vertex_time_ns" in merged.columns:
+        event_time = pd.to_numeric(merged["vertex_time_ns"], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+    else:
+        event_time = np.zeros(len(merged), dtype=float)
+
+    valid = (
+        np.isfinite(distance)
+        & np.isfinite(hit_time)
+        & np.isfinite(event_time)
+        & (distance >= 0.0)
+    )
+    if detector_key == "leadglass":
+        sigma = config.leadglass_time_resolution_ns
+        center = event_time + distance / config.speed_of_light_cm_per_ns
+        start = center - 2.0 * sigma
+        end = center + 2.0 * sigma
+    else:
+        sigma = config.scintillator_time_resolution_ns
+        fast_beta = _beta_from_kinetic_energy(
+            config.fast_pion_kinetic_energy_mev,
+            config.charged_pion_mass_mev,
+        )
+        slow_beta = _beta_from_kinetic_energy(
+            config.slow_pion_kinetic_energy_mev,
+            config.charged_pion_mass_mev,
+        )
+        if fast_beta <= 0.0 or slow_beta <= 0.0:
+            return _false_timing_annotation(hits)
+        start = event_time + distance / (fast_beta * config.speed_of_light_cm_per_ns) - 2.0 * sigma
+        end = event_time + distance / (slow_beta * config.speed_of_light_cm_per_ns) + 2.0 * sigma
+
+    in_window = valid & (hit_time >= start) & (hit_time <= end)
+    annotated = hits.copy()
+    annotated["distance_to_vertex"] = distance
+    annotated["timing_window_start_ns"] = start
+    annotated["timing_window_end_ns"] = end
+    annotated["in_timing_window"] = in_window
+    return annotated
 
 
 def _has_foil_origin(group: pd.DataFrame) -> bool:
@@ -403,6 +503,7 @@ def reconstruct_event_vertices(tpc: pd.DataFrame) -> pd.DataFrame:
         "vertex_x",
         "vertex_y",
         "vertex_z",
+        "vertex_time_ns",
         "vertex_radial_spread",
         "n_projected_tracks",
         "n_skipped_tracks",
@@ -423,8 +524,12 @@ def reconstruct_event_vertices(tpc: pd.DataFrame) -> pd.DataFrame:
     skipped_by_event: dict[int, int] = {}
     for (event_id, track_id), group in working.sort_values(sort_cols).groupby(["Event_ID", "Track_ID"], dropna=False):
         event_key = int(event_id)
-        coords = group[["x", "y", "z"]].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
-        coords = coords[np.isfinite(coords).all(axis=1)]
+        numeric_cols = ["x", "y", "z"] + (["t"] if "t" in group.columns else [])
+        numeric = group[numeric_cols].apply(pd.to_numeric, errors="coerce")
+        coords = numeric[["x", "y", "z"]].to_numpy(dtype=float)
+        valid_coords = np.isfinite(coords).all(axis=1)
+        coords = coords[valid_coords]
+        times = numeric["t"].to_numpy(dtype=float)[valid_coords] if "t" in numeric else None
         if len(coords) < 2:
             skipped_by_event[event_key] = skipped_by_event.get(event_key, 0) + 1
             continue
@@ -438,6 +543,9 @@ def reconstruct_event_vertices(tpc: pd.DataFrame) -> pd.DataFrame:
 
         scale = -start[2] / direction[2]
         vertex = start + scale * direction
+        projected_time = float("nan")
+        if times is not None and len(times) >= 2 and np.isfinite(times[0]) and np.isfinite(times[-1]):
+            projected_time = float(times[0] + scale * (times[-1] - times[0]))
         if not np.isfinite(vertex).all():
             skipped_by_event[event_key] = skipped_by_event.get(event_key, 0) + 1
             continue
@@ -449,6 +557,7 @@ def reconstruct_event_vertices(tpc: pd.DataFrame) -> pd.DataFrame:
                 "projected_x": float(vertex[0]),
                 "projected_y": float(vertex[1]),
                 "projected_z": 0.0,
+                "projected_time_ns": projected_time,
             }
         )
 
@@ -460,6 +569,8 @@ def reconstruct_event_vertices(tpc: pd.DataFrame) -> pd.DataFrame:
     for event_id, event_tracks in projected.groupby("event_id", dropna=False):
         xy = event_tracks[["projected_x", "projected_y"]].to_numpy(dtype=float)
         center = np.mean(xy, axis=0)
+        projected_times = pd.to_numeric(event_tracks["projected_time_ns"], errors="coerce").dropna()
+        vertex_time = float(projected_times.mean()) if not projected_times.empty else float("nan")
         spread = float(np.sqrt(np.mean(np.sum((xy - center) ** 2, axis=1)))) if len(xy) else float("nan")
         rows.append(
             {
@@ -467,6 +578,7 @@ def reconstruct_event_vertices(tpc: pd.DataFrame) -> pd.DataFrame:
                 "vertex_x": float(center[0]),
                 "vertex_y": float(center[1]),
                 "vertex_z": 0.0,
+                "vertex_time_ns": vertex_time,
                 "vertex_radial_spread": spread,
                 "n_projected_tracks": int(len(event_tracks)),
                 "n_skipped_tracks": int(skipped_by_event.get(int(event_id), 0)),
@@ -642,6 +754,20 @@ def summarize_events(
         lead_e = _safe_sum(lead_event, "eDep")
         upper_lead_e = _safe_sum(lead_event[lead_event["y"] > 0], "eDep") if "y" in lead_event else 0.0
         lower_lead_e = _safe_sum(lead_event[lead_event["y"] < 0], "eDep") if "y" in lead_event else 0.0
+        timed_scint = annotate_timing_windows(scint_event, vertices, "scintillator", config)
+        timed_lead = annotate_timing_windows(lead_event, vertices, "leadglass", config)
+        in_time_scint = (
+            timed_scint[timed_scint["in_timing_window"] == True]  # noqa: E712
+            if "in_timing_window" in timed_scint
+            else pd.DataFrame()
+        )
+        in_time_lead = (
+            timed_lead[timed_lead["in_timing_window"] == True]  # noqa: E712
+            if "in_timing_window" in timed_lead
+            else pd.DataFrame()
+        )
+        scint_timing_e = _safe_sum(in_time_scint, "eDep")
+        lead_timing_e = _safe_sum(in_time_lead, "eDep")
         scint_longitudinal_e, scint_transverse_e = _directional_energy(scint_event)
         lead_longitudinal_e, lead_transverse_e = _directional_energy(lead_event)
         tpc_e = _safe_sum(tpc_event, "eDep")
@@ -678,15 +804,22 @@ def summarize_events(
             "vertex_x": vertex.get("vertex_x", float("nan")),
             "vertex_y": vertex.get("vertex_y", float("nan")),
             "vertex_z": vertex.get("vertex_z", float("nan")),
+            "vertex_time_ns": vertex.get("vertex_time_ns", float("nan")),
             "vertex_radial_spread": vertex.get("vertex_radial_spread", float("nan")),
             "n_vertex_tracks": int(vertex.get("n_projected_tracks", 0)),
             "scintillator_edep": scint_e,
+            "scintillator_timing_edep": scint_timing_e,
+            "scintillator_out_of_time_edep": scint_e - scint_timing_e,
             "upper_scintillator_edep": upper_scint_e,
             "lower_scintillator_edep": lower_scint_e,
             "leadglass_edep": lead_e,
+            "leadglass_timing_edep": lead_timing_e,
+            "leadglass_out_of_time_edep": lead_e - lead_timing_e,
             "upper_leadglass_edep": upper_lead_e,
             "lower_leadglass_edep": lower_lead_e,
             "calorimeter_edep": scint_e + lead_e,
+            "calorimeter_timing_edep": scint_timing_e + lead_timing_e,
+            "calorimeter_out_of_time_edep": (scint_e - scint_timing_e) + (lead_e - lead_timing_e),
             "scintillator_longitudinal_energy": scint_longitudinal_e,
             "scintillator_transverse_energy": scint_transverse_e,
             "leadglass_longitudinal_energy": lead_longitudinal_e,
