@@ -55,6 +55,48 @@ def test_charged_pid_uses_dedx_and_range() -> None:
     assert pid_by_track[20] == "proton"
 
 
+def test_charged_direction_uses_tpc_hit_geometry_before_momentum_columns() -> None:
+    tpc = pd.DataFrame(
+        [
+            {
+                "Event_ID": 1,
+                "Track_ID": 10,
+                "Name": "pi+",
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0,
+                "px": 1.0,
+                "py": 0.0,
+                "pz": 0.0,
+                "t": 1.0,
+                "eDep": 0.2,
+                "trackl": 1.0,
+            },
+            {
+                "Event_ID": 1,
+                "Track_ID": 10,
+                "Name": "pi+",
+                "x": 0.0,
+                "y": 10.0,
+                "z": 0.0,
+                "px": 1.0,
+                "py": 0.0,
+                "pz": 0.0,
+                "t": 2.0,
+                "eDep": 0.3,
+                "trackl": 1.0,
+            },
+        ]
+    )
+
+    charged = reconstruct_charged_objects(tpc)
+    row = charged.iloc[0]
+
+    assert row["px"] == pytest.approx(0.0)
+    assert row["py"] == pytest.approx(1.0)
+    assert row["pz"] == pytest.approx(0.0)
+
+
 def test_pi0_candidate_uses_thesis_selection_cuts() -> None:
     lead = pd.DataFrame(
         [

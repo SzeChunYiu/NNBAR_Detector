@@ -47,6 +47,10 @@ scintillator energy `<=930 MeV`. The visible invariant mass is reconstructed
 from object directions and deposited/visible energies, so it is a first analysis
 surface rather than a calibrated final mass estimator.
 
+Charged-object directions are reconstructed from the ordered TPC hit positions
+when those coordinates are available. The simulation momentum columns are used
+only as a fallback for sparse tables without enough positional information.
+
 The longitudinal and transverse energy variables follow the Chapter 9 event-shape
 definitions using the detector z-axis as the beam axis: `EL = sum(E_i cos(alpha_i))`
 and `ET = sum(E_i sin(alpha_i))`, evaluated separately for scintillator and
