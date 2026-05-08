@@ -94,8 +94,10 @@ python3 -m nnbar_reconstruction.cli summarize build-codex-setup2/output --run 0
 python3 -m nnbar_reconstruction.cli summarize build-codex-setup2/output --run 0 --tables-dir reconstruction_out
 python3 -m nnbar_reconstruction.cli scan-pid build-codex-setup2/output --run 0 --table pid_scan.csv
 python3 -m nnbar_reconstruction.cli scan-pid build-codex-setup2/output --runs 0,1,2 --table pid_scan.csv
+python3 -m nnbar_reconstruction.cli scan-pid build-codex-setup2/output --all-runs --table pid_scan.csv
 python3 -m nnbar_reconstruction.cli validate-reco build-codex-setup2/output --run 0 --json reco_validation.json
 python3 -m nnbar_reconstruction.cli validate-reco build-codex-setup2/output --runs 0,1,2 --json reco_validation.json
+python3 -m nnbar_reconstruction.cli validate-reco build-codex-setup2/output --all-runs --json reco_validation.json
 ```
 
 The CSV tables are intended as the handoff surface for plotting, cut-flow
@@ -106,13 +108,15 @@ simulation truth labels carried through the output tables. It reports the best
 ranked threshold sets by balanced proton/pion F1 and can save the full scan table
 for calibration studies before updating the default reconstruction constants.
 The JSON includes `calibration_usable`; it is false when the scanned sample lacks
-either truth-labelled protons or truth-labelled charged pions. Use `--runs` to
-combine multiple simulation runs into one threshold scan; event ids are offset
-internally so repeated run-local event and track ids do not collide.
+either truth-labelled protons or truth-labelled charged pions. Use `--runs` or
+`--all-runs` to combine multiple simulation runs into one threshold scan; event
+ids are offset internally so repeated run-local event and track ids do not
+collide.
 
 The `validate-reco` command reconstructs one or more runs and reports
 truth-supported validation metrics for charged pion/proton PID and lead-glass
 charged/neutral matching. Each metric includes a `usable` flag so single-class
 or unlabeled samples are not treated as complete validation evidence. For
-multi-run validation, the JSON includes both per-run reports and an `aggregate`
-report computed after combining reconstructed tables across the requested runs.
+multi-run validation through `--runs` or `--all-runs`, the JSON includes both
+per-run reports and an `aggregate` report computed after combining reconstructed
+tables across the requested runs.

@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 from .calibration import scan_charged_pid_thresholds
-from .io import load_run
+from .io import discover_runs, load_run
 from .reconstruction import reconstruct_run
 from .validation import aggregate_reconstruction_truth, evaluate_reconstruction_truth
 
@@ -101,6 +101,20 @@ def _int_grid(value: str) -> list[int]:
     return values
 
 
+def _all_discovered_runs(output_dir: Path) -> list[int]:
+    discovered = discover_runs(output_dir)
+    runs = sorted({run for values in discovered.values() for run in values})
+    if not runs:
+        raise SystemExit(f"no *_output_<run>.parquet files found in {output_dir}")
+    return runs
+
+
+def _resolve_runs(args: argparse.Namespace) -> list[int]:
+    if getattr(args, "all_runs", False):
+        return _all_discovered_runs(args.output_dir)
+    return args.runs if args.runs is not None else [args.run]
+
+
 def _load_pid_scan_tables(output_dir: Path, runs: list[int]) -> tuple:
     tpc_tables = []
     scintillator_tables = []
@@ -122,7 +136,7 @@ def _load_pid_scan_tables(output_dir: Path, runs: list[int]) -> tuple:
 
 
 def scan_pid(args: argparse.Namespace) -> int:
-    runs = args.runs if args.runs is not None else [args.run]
+    runs = _resolve_runs(args)
     tpc, scintillator = _load_pid_scan_tables(args.output_dir, runs)
     scan = scan_charged_pid_thresholds(
         tpc,
@@ -154,7 +168,7 @@ def scan_pid(args: argparse.Namespace) -> int:
 
 
 def validate_reco(args: argparse.Namespace) -> int:
-    runs = args.runs if args.runs is not None else [args.run]
+    runs = _resolve_runs(args)
     reports = []
     results = []
     for run in runs:
@@ -202,6 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_scan_pid.add_argument("output_dir", type=Path, help="Directory containing *_output_<run>.parquet files")
     p_scan_pid.add_argument("--run", type=int, default=0, help="Run number to scan")
     p_scan_pid.add_argument("--runs", type=_int_grid, help="Comma-separated run numbers to combine")
+    p_scan_pid.add_argument("--all-runs", action="store_true", help="Discover and combine all available runs")
     p_scan_pid.add_argument(
         "--proton-dedx",
         type=_float_grid,
@@ -229,6 +244,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_validate.add_argument("output_dir", type=Path, help="Directory containing *_output_<run>.parquet files")
     p_validate.add_argument("--run", type=int, default=0, help="Run number to validate")
     p_validate.add_argument("--runs", type=_int_grid, help="Comma-separated run numbers to validate")
+    p_validate.add_argument("--all-runs", action="store_true", help="Discover and validate all available runs")
     p_validate.add_argument("--json", type=Path, help="Optional JSON validation report path")
     p_validate.set_defaults(func=validate_reco)
 
