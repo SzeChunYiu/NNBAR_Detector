@@ -8,3 +8,9 @@ build/
 build-*/
 build-codex*/
 output/
+test.parquet
+external/arrow-src/
+external/arrow-install/
+external/arrow-install-linux/
+external/spdlog-install/
+external/spdlog-install-linux/
