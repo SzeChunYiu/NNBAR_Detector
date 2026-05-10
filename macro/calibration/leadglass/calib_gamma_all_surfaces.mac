@@ -1,0 +1,51 @@
+# ============================================================================
+# Lead Glass Calibration - All Surfaces at Reference Energy
+# ============================================================================
+# Purpose: Check uniformity of lead glass response across all surfaces
+# Physics: 300 MeV is near peak of photon spectrum - good reference point
+#          Each surface may have slightly different geometry/acceptance
+# Output: Surface-by-surface comparison of Cerenkov yield
+# ============================================================================
+
+/run/initialize
+/tracking/verbose 0
+
+# Calibration configuration
+/calibration/mode true
+/calibration/target leadglass
+/calibration/particle gamma
+/calibration/energy 300 MeV
+/calibration/spread 2.0
+
+# Output folder
+/particle_generator/set_folder_name calibration/leadglass_gamma_surfaces
+
+# Top surface
+/calibration/surface 0
+/particle_generator/set_run_number 0
+/run/beamOn 3000
+
+# Right surface
+/calibration/surface 1
+/particle_generator/set_run_number 1
+/run/beamOn 3000
+
+# Bottom surface
+/calibration/surface 2
+/particle_generator/set_run_number 2
+/run/beamOn 3000
+
+# Left surface
+/calibration/surface 3
+/particle_generator/set_run_number 3
+/run/beamOn 3000
+
+# Front surface (primary)
+/calibration/surface 4
+/particle_generator/set_run_number 4
+/run/beamOn 3000
+
+# Back surface
+/calibration/surface 5
+/particle_generator/set_run_number 5
+/run/beamOn 3000

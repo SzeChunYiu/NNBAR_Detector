@@ -1,0 +1,84 @@
+# ============================================================================
+# Lead Glass Calibration - Gamma Energy Scan
+# ============================================================================
+# Purpose: Map Cerenkov response vs photon energy
+# Physics: pi0 -> gamma gamma produces photons with energy spectrum
+#          peaking ~300 MeV (boosted from 67.5 MeV in rest frame)
+#          extending to ~800 MeV. Lead glass measures EM showers via
+#          Cerenkov radiation with yield ~200 photons/MeV.
+# Resolution: sigma/E = 5%/sqrt(E) + 2% (stochastic + constant term)
+# Output: Calibration curve - Cerenkov photons vs true gamma energy
+# ============================================================================
+
+/run/initialize
+/tracking/verbose 0
+
+# Calibration configuration
+/calibration/mode true
+/calibration/target leadglass
+/calibration/particle gamma
+/calibration/spread 2.0
+
+# Output folder
+/particle_generator/set_folder_name calibration/leadglass_gamma_scan
+
+# Target front surface (where most gammas from annihilation hit)
+/calibration/surface 4
+
+# Energy scan: 50-800 MeV covering pi0 decay photon spectrum
+# Fine binning around the peak (~300 MeV)
+
+# 50 MeV - Low energy, shower containment may be an issue
+/calibration/energy 50 MeV
+/particle_generator/set_run_number 50
+/run/beamOn 5000
+
+# 100 MeV
+/calibration/energy 100 MeV
+/particle_generator/set_run_number 100
+/run/beamOn 5000
+
+# 150 MeV
+/calibration/energy 150 MeV
+/particle_generator/set_run_number 150
+/run/beamOn 5000
+
+# 200 MeV
+/calibration/energy 200 MeV
+/particle_generator/set_run_number 200
+/run/beamOn 5000
+
+# 250 MeV - Approaching peak
+/calibration/energy 250 MeV
+/particle_generator/set_run_number 250
+/run/beamOn 5000
+
+# 300 MeV - Peak of photon spectrum
+/calibration/energy 300 MeV
+/particle_generator/set_run_number 300
+/run/beamOn 5000
+
+# 350 MeV
+/calibration/energy 350 MeV
+/particle_generator/set_run_number 350
+/run/beamOn 5000
+
+# 400 MeV
+/calibration/energy 400 MeV
+/particle_generator/set_run_number 400
+/run/beamOn 5000
+
+# 500 MeV
+/calibration/energy 500 MeV
+/particle_generator/set_run_number 500
+/run/beamOn 5000
+
+# 600 MeV
+/calibration/energy 600 MeV
+/particle_generator/set_run_number 600
+/run/beamOn 5000
+
+# 800 MeV - Upper tail
+/calibration/energy 800 MeV
+/particle_generator/set_run_number 800
+/run/beamOn 5000

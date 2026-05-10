@@ -1,0 +1,17 @@
+# NNBAR Signal Simulation - 100k events
+# MCPL file: NNBAR_rwag_signal_GBL_jbar_100k_9009.mcpl
+# Contains 100,000 events with 3-18 particles per event (804,968 total particles)
+
+/run/initialize
+/tracking/verbose 0
+/physics_engine/neutron/timeLimit 10000 s
+
+/control/alias name signal_100k
+/particle_generator/set_folder_name signal_100k
+/particle_generator/set_mcpl_file ./mcpl_files/NNBAR_rwag_signal_GBL_jbar_100k_9009.mcpl
+/particle_generator/set_run_number 0
+/particle_generator/set_event_number 1
+
+# Run all 100k events
+# The MCPL generator will process all particles for each event based on userflags
+/run/beamOn 100000

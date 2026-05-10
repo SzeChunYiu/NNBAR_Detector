@@ -1,0 +1,22 @@
+# =============================================================================
+# Signal training data: pi- from origin with isotropic directions
+# For P-Signal classifier training (label=1: signal)
+# =============================================================================
+# Usage: ./nnbar-detector-simulation -m macros/signal_pion_minus.mac -t 4
+
+# Initialize
+/run/initialize
+
+# Set output folder (creates output/signal_pim/)
+/particle_generator/set_folder_name signal_pim
+
+# Signal mode (calibration mode disabled)
+/calibration/mode false
+
+# Set signal particle type and energy range
+/calibration/signal_particle pi-
+/calibration/signal_energy_min 50 MeV
+/calibration/signal_energy_max 500 MeV
+
+# Run events
+/run/beamOn 5000

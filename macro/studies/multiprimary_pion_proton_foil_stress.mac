@@ -1,0 +1,16 @@
+# Multi-primary charged pion/proton foil-origin reconstruction stress sample.
+#
+# Each event contains one pi+, one pi-, and one proton emitted from the shared
+# foil-origin event vertex. This complements the single-primary species/range
+# stress sample by testing event-level topology and object separation.
+
+/run/initialize
+/tracking/verbose 0
+
+/particle_generator/set_folder_name studies/multiprimary_pion_proton_foil_stress
+
+/calibration/signal_particles pi+,pi-,proton
+/calibration/signal_energy_min 50 MeV
+/calibration/signal_energy_max 500 MeV
+/particle_generator/set_run_number 0
+/run/beamOn 200

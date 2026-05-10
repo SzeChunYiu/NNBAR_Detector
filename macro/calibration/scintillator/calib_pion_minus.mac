@@ -1,0 +1,44 @@
+# ============================================================================
+# Scintillator Calibration - Negative Pion (pi-)
+# ============================================================================
+# Purpose: Compare pi- response to pi+ (nuclear capture effects)
+# Physics: pi- can undergo nuclear capture at rest, producing different
+#          response than pi+. Important for charge-symmetric reconstruction.
+# Output: pi- calibration curve for comparison with pi+
+# ============================================================================
+
+/run/initialize
+/tracking/verbose 0
+
+# Calibration configuration
+/calibration/mode true
+/calibration/target scintillator
+/calibration/particle pi-
+/calibration/spread 3.0
+
+# Output folder
+/particle_generator/set_folder_name calibration/scintillator_pion_minus
+
+# Target top surface
+/calibration/surface 0
+
+# Energy scan matching pi+ for direct comparison
+/calibration/energy 50 MeV
+/particle_generator/set_run_number 50
+/run/beamOn 5000
+
+/calibration/energy 100 MeV
+/particle_generator/set_run_number 100
+/run/beamOn 5000
+
+/calibration/energy 200 MeV
+/particle_generator/set_run_number 200
+/run/beamOn 5000
+
+/calibration/energy 300 MeV
+/particle_generator/set_run_number 300
+/run/beamOn 5000
+
+/calibration/energy 500 MeV
+/particle_generator/set_run_number 500
+/run/beamOn 5000

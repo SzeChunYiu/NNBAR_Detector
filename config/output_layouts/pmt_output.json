@@ -1,0 +1,13 @@
+{
+    "fields": [
+        {"name": "Event_ID", "type": "int32"},
+        {"name": "Module_ID", "type": "int32"},
+        {"name": "x", "type": "double"},
+        {"name": "y", "type": "double"},
+        {"name": "z", "type": "double"},
+        {"name": "Photon_Index", "type": "int32"},
+        {"name": "photons", "type": "int32"},
+        {"name": "KE", "type": "double"},
+        {"name": "t", "type": "double"}
+    ]
+}

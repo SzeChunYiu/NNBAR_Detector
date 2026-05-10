@@ -1,0 +1,68 @@
+# ============================================================================
+# Scintillator Calibration - Pion Energy Scan
+# ============================================================================
+# Purpose: Map scintillation response vs pion energy
+# Physics: Pions from n-nbar annihilation have spectrum peaking ~100 MeV
+#          extending to ~600 MeV. Need to understand non-linear response
+#          at low energies due to quenching (Birks' law) and nuclear
+#          interactions at higher energies.
+# Output: Calibration curve - scintillation photons vs true pion energy
+# ============================================================================
+
+/run/initialize
+/tracking/verbose 0
+
+# Calibration configuration
+/calibration/mode true
+/calibration/target scintillator
+/calibration/particle pi+
+/calibration/spread 3.0
+
+# Output folder
+/particle_generator/set_folder_name calibration/scintillator_pion_scan
+
+# Target top surface for energy scan
+/calibration/surface 0
+
+# Energy scan: 50, 100, 150, 200, 300, 400, 500 MeV
+# These cover the expected pion energy spectrum from annihilation
+
+# 50 MeV - Low energy, significant quenching expected
+/calibration/energy 50 MeV
+/particle_generator/set_run_number 50
+/run/beamOn 5000
+
+# 100 MeV - Near peak of pion spectrum
+/calibration/energy 100 MeV
+/particle_generator/set_run_number 100
+/run/beamOn 5000
+
+# 150 MeV
+/calibration/energy 150 MeV
+/particle_generator/set_run_number 150
+/run/beamOn 5000
+
+# 200 MeV
+/calibration/energy 200 MeV
+/particle_generator/set_run_number 200
+/run/beamOn 5000
+
+# 300 MeV - MIP reference
+/calibration/energy 300 MeV
+/particle_generator/set_run_number 300
+/run/beamOn 5000
+
+# 400 MeV
+/calibration/energy 400 MeV
+/particle_generator/set_run_number 400
+/run/beamOn 5000
+
+# 500 MeV - High energy tail
+/calibration/energy 500 MeV
+/particle_generator/set_run_number 500
+/run/beamOn 5000
+
+# 600 MeV - Upper end of spectrum
+/calibration/energy 600 MeV
+/particle_generator/set_run_number 600
+/run/beamOn 5000

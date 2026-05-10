@@ -1,0 +1,51 @@
+# ============================================================================
+# Scintillator Calibration - Pion MIP Reference
+# ============================================================================
+# Purpose: Establish MIP (minimum ionizing) response using 300 MeV pions
+# Physics: At this energy, pions are close to MIP behavior (dE/dx ~ 2 MeV/cm)
+# Output: Baseline scintillation photon yield per MeV deposited
+# ============================================================================
+
+/run/initialize
+/tracking/verbose 0
+
+# Calibration configuration
+/calibration/mode true
+/calibration/target scintillator
+/calibration/particle pi+
+/calibration/energy 300 MeV
+/calibration/spread 3.0
+
+# Output folder setup
+/particle_generator/set_folder_name calibration/scintillator_pion_mip
+
+# Run for each surface (top=0, right=1, bottom=2, left=3, front=4, back=5)
+# Top surface
+/calibration/surface 0
+/particle_generator/set_run_number 0
+/run/beamOn 5000
+
+# Right surface
+/calibration/surface 1
+/particle_generator/set_run_number 1
+/run/beamOn 5000
+
+# Bottom surface
+/calibration/surface 2
+/particle_generator/set_run_number 2
+/run/beamOn 5000
+
+# Left surface
+/calibration/surface 3
+/particle_generator/set_run_number 3
+/run/beamOn 5000
+
+# Front surface
+/calibration/surface 4
+/particle_generator/set_run_number 4
+/run/beamOn 5000
+
+# Back surface
+/calibration/surface 5
+/particle_generator/set_run_number 5
+/run/beamOn 5000

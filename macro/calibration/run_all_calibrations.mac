@@ -1,0 +1,57 @@
+# ============================================================================
+# Master Calibration Script - Run All Calibrations
+# ============================================================================
+# This script runs the complete calibration suite for NNBAR detector
+#
+# Calibration Strategy:
+# 1. Scintillator: Pions (pi+/pi-) - actual signal particles
+#    - MIP reference at 300 MeV
+#    - Energy scan 50-600 MeV
+#    - pi- comparison for nuclear capture effects
+#
+# 2. Lead Glass: Photons (gamma) - from pi0 decay
+#    - Energy scan 50-800 MeV
+#    - All-surface uniformity check
+#    - Electron validation cross-check
+#
+# Physics Motivation:
+# - n-nbar annihilation produces ~5 pions (pi+, pi-, pi0)
+# - pi0 -> gamma gamma (immediate decay)
+# - Pion spectrum peaks ~100 MeV, extends to ~600 MeV
+# - Photon spectrum peaks ~300 MeV, extends to ~800 MeV
+# ============================================================================
+
+/run/initialize
+/tracking/verbose 0
+
+# ============================================================================
+# PHASE 1: Scintillator Pion Calibration
+# ============================================================================
+
+/control/cout/ignoreThreadsExcept 0
+
+# 1.1 Pion MIP reference (all surfaces)
+/control/execute ./macro/calibration/scintillator/calib_pion_mip.mac
+
+# 1.2 Pion energy scan (pi+)
+/control/execute ./macro/calibration/scintillator/calib_pion_energy_scan.mac
+
+# 1.3 Pion- comparison
+/control/execute ./macro/calibration/scintillator/calib_pion_minus.mac
+
+# ============================================================================
+# PHASE 2: Lead Glass Photon Calibration
+# ============================================================================
+
+# 2.1 Photon energy scan
+/control/execute ./macro/calibration/leadglass/calib_gamma_energy_scan.mac
+
+# 2.2 All-surface uniformity check
+/control/execute ./macro/calibration/leadglass/calib_gamma_all_surfaces.mac
+
+# 2.3 Electron validation
+/control/execute ./macro/calibration/leadglass/calib_electron_validation.mac
+
+# ============================================================================
+# Calibration Complete
+# ============================================================================

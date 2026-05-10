@@ -1,1 +1,10 @@
 *.mcpl
+.DS_Store
+._*
+__pycache__/
+.pytest_cache/
+pytest-of-*/
+build/
+build-*/
+build-codex*/
+output/

@@ -1,0 +1,29 @@
+# =============================================================================
+# Background training data: Compton electrons from TPC inner surface
+# For P-Signal classifier training (label=0: background)
+# =============================================================================
+# Electrons are generated on the TPC inner cylindrical surface (r=114 cm)
+# with inward-pointing directions, simulating Compton scatter background.
+# Usage: ./nnbar-detector-simulation -m macros/background_compton.mac -t 4
+
+# Initialize
+/run/initialize
+
+# Set output folder (creates output/background_compton/)
+/particle_generator/set_folder_name background_compton
+
+# Enable calibration mode with TPC surface target
+/calibration/mode true
+/calibration/target tpc_surface
+
+# Set electron parameters
+# Compton electrons typically have energy spectrum from ~1-10 MeV
+/calibration/particle e-
+/calibration/energy_min 1 MeV
+/calibration/energy_max 10 MeV
+
+# Angular spread for realistic Compton scattering (30 degrees typical)
+/calibration/spread 30
+
+# Run events
+/run/beamOn 10000

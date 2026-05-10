@@ -1,0 +1,18 @@
+# Pi0 foil mass study: shoot neutral pions from the source-foil area.
+# The primary starts at the generator origin, matching the foil-centered
+# reconstruction assumption used by the offline pi0 mass ladder.
+# In an MCPL-enabled build, launch this macro with the executable's -g flag.
+
+/run/initialize
+/tracking/verbose 0
+/physics_engine/neutron/timeLimit 10000 s
+
+/calibration/signal_particle pi0
+/calibration/signal_energy_min 500 MeV
+/calibration/signal_energy_max 500 MeV
+
+/particle_generator/set_folder_name studies/pi0_foil_500mev
+/particle_generator/set_run_number 0
+/particle_generator/set_event_number 0
+
+/run/beamOn 200

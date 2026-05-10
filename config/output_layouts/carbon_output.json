@@ -1,0 +1,20 @@
+{
+    "fields": [
+        {"name": "Event_ID", "type": "int32"},
+        {"name": "Track_ID", "type": "int32"},
+        {"name": "Parent_ID", "type": "int32"},
+        {"name": "Name", "type": "string"},
+        {"name": "Proc", "type": "string"},
+        {"name": "Step_info", "type": "int32"},
+        {"name": "Origin", "type": "string"},
+        {"name": "x", "type": "double"},
+        {"name": "y", "type": "double"},
+        {"name": "z", "type": "double"},
+        {"name": "px", "type": "double"},
+        {"name": "py", "type": "double"},
+        {"name": "pz", "type": "double"},
+        {"name": "t", "type": "double"},
+        {"name": "KE", "type": "double"},
+        {"name": "eDep", "type": "double"}
+    ]
+}

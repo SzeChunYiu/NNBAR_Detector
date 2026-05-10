@@ -1,0 +1,50 @@
+# Pi0 foil energy scan: fixed kinetic-energy neutral pions from the source foil.
+#
+# Each run uses the same foil-origin isotropic signal generator as
+# pi0_foil_mass.mac, with signal_energy_min == signal_energy_max so the primary
+# kinetic energy is fixed. Run numbers encode the energy ladder:
+# run 0 = 100 MeV, run 1 = 200 MeV, ..., run 5 = 600 MeV.
+# In an MCPL-enabled build, launch this macro with the executable's -g flag.
+
+/run/initialize
+/tracking/verbose 0
+/physics_engine/neutron/timeLimit 10000 s
+
+/calibration/signal_particle pi0
+/particle_generator/set_folder_name studies/pi0_foil_energy_scan
+
+/calibration/signal_energy_min 100 MeV
+/calibration/signal_energy_max 100 MeV
+/particle_generator/set_run_number 0
+/particle_generator/set_event_number 0
+/run/beamOn 200
+
+/calibration/signal_energy_min 200 MeV
+/calibration/signal_energy_max 200 MeV
+/particle_generator/set_run_number 1
+/particle_generator/set_event_number 0
+/run/beamOn 200
+
+/calibration/signal_energy_min 300 MeV
+/calibration/signal_energy_max 300 MeV
+/particle_generator/set_run_number 2
+/particle_generator/set_event_number 0
+/run/beamOn 200
+
+/calibration/signal_energy_min 400 MeV
+/calibration/signal_energy_max 400 MeV
+/particle_generator/set_run_number 3
+/particle_generator/set_event_number 0
+/run/beamOn 200
+
+/calibration/signal_energy_min 500 MeV
+/calibration/signal_energy_max 500 MeV
+/particle_generator/set_run_number 4
+/particle_generator/set_event_number 0
+/run/beamOn 200
+
+/calibration/signal_energy_min 600 MeV
+/calibration/signal_energy_max 600 MeV
+/particle_generator/set_run_number 5
+/particle_generator/set_event_number 0
+/run/beamOn 200

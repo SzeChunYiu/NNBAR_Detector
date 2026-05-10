@@ -1,0 +1,47 @@
+# ============================================================================
+# Lead Glass Calibration - Electron Validation
+# ============================================================================
+# Purpose: Cross-validate gamma calibration using electrons
+# Physics: Electrons also produce EM showers in lead glass, but with
+#          different shower development (no pair production step).
+#          This provides a systematic cross-check of the Cerenkov yield.
+# Note: In actual experiment, electrons from pair production in material
+#       before lead glass could contaminate photon sample - good to study.
+# Output: Electron response for comparison with gamma response
+# ============================================================================
+
+/run/initialize
+/tracking/verbose 0
+
+# Calibration configuration
+/calibration/mode true
+/calibration/target leadglass
+/calibration/particle e-
+/calibration/spread 2.0
+
+# Output folder
+/particle_generator/set_folder_name calibration/leadglass_electron_validation
+
+# Target front surface
+/calibration/surface 4
+
+# Energy scan at same points as gamma for direct comparison
+/calibration/energy 100 MeV
+/particle_generator/set_run_number 100
+/run/beamOn 3000
+
+/calibration/energy 200 MeV
+/particle_generator/set_run_number 200
+/run/beamOn 3000
+
+/calibration/energy 300 MeV
+/particle_generator/set_run_number 300
+/run/beamOn 3000
+
+/calibration/energy 400 MeV
+/particle_generator/set_run_number 400
+/run/beamOn 3000
+
+/calibration/energy 500 MeV
+/particle_generator/set_run_number 500
+/run/beamOn 3000

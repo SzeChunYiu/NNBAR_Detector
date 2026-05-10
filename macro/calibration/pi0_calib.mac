@@ -1,0 +1,25 @@
+# Pi0 Calibration Macro - Tests pi0 detection via gamma decay
+# Pi0 -> 2gamma, mass = 134.98 MeV
+
+/run/initialize
+/tracking/verbose 0
+
+# Calibration configuration
+/calibration/mode true
+/calibration/target leadglass
+/calibration/particle pi0
+/calibration/spread 3.0
+/calibration/surface 4
+
+# Output folder
+/particle_generator/set_folder_name output/test_pi0
+
+# Energy scan at 200 MeV
+/calibration/energy 200 MeV
+/particle_generator/set_run_number 200
+/run/beamOn 50
+
+# Higher energy test at 500 MeV
+/calibration/energy 500 MeV
+/particle_generator/set_run_number 500
+/run/beamOn 50

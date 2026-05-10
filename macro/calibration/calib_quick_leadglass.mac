@@ -1,0 +1,48 @@
+# ============================================================================
+# Quick Lead Glass Calibration - Photon Energy Scan
+# ============================================================================
+# Fast calibration run for lead glass Cerenkov response
+# Uses photons at various energies, targeting front surface
+# ============================================================================
+
+/run/initialize
+/tracking/verbose 0
+
+# Calibration configuration
+/calibration/mode true
+/calibration/target leadglass
+/calibration/particle gamma
+/calibration/spread 3.0
+/calibration/surface 4
+
+# Output folder
+/particle_generator/set_folder_name calibration/leadglass_gamma_calib
+
+# Energy scan: 100, 200, 300, 400, 500, 600, 800 MeV
+/calibration/energy 100 MeV
+/particle_generator/set_run_number 100
+/run/beamOn 1000
+
+/calibration/energy 200 MeV
+/particle_generator/set_run_number 200
+/run/beamOn 1000
+
+/calibration/energy 300 MeV
+/particle_generator/set_run_number 300
+/run/beamOn 1000
+
+/calibration/energy 400 MeV
+/particle_generator/set_run_number 400
+/run/beamOn 1000
+
+/calibration/energy 500 MeV
+/particle_generator/set_run_number 500
+/run/beamOn 1000
+
+/calibration/energy 600 MeV
+/particle_generator/set_run_number 600
+/run/beamOn 1000
+
+/calibration/energy 800 MeV
+/particle_generator/set_run_number 800
+/run/beamOn 1000

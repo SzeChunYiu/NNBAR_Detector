@@ -1,0 +1,19 @@
+{
+    "fields": [
+        {"name": "Event_ID", "type": "int32"},
+        {"name": "PID", "type": "int32"},
+        {"name": "Mass", "type": "double"},
+        {"name": "Name", "type": "string"},
+        {"name": "Charge", "type": "double"},
+        {"name": "KE", "type": "double"},
+        {"name": "angle", "type": "double"},
+        {"name": "x", "type": "double"},
+        {"name": "y", "type": "double"},
+        {"name": "z", "type": "double"},
+        {"name": "t", "type": "double"},
+        {"name": "u", "type": "double"},
+        {"name": "v", "type": "double"},
+        {"name": "w", "type": "double"},
+        {"name": "weight", "type": "double"}
+    ]
+}

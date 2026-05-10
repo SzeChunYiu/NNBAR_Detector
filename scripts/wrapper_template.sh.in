@@ -1,0 +1,32 @@
+#!/bin/bash
+# Wrapper script for NNBAR detector simulation
+# Automatically sets up required runtime paths for the detected build.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source Geant4 data paths from conda activation snippets when available.
+# Conda Geant4 packages intentionally make bin/geant4.sh a no-op/error; the
+# data variables (G4ENSDFSTATEDATA, G4NEUTRONHPDATA, ...) live in activate.d.
+if [ -n "@GEANT4_INSTALL@" ]; then
+    if [ -d "@GEANT4_INSTALL@/etc/conda/activate.d" ]; then
+        export CONDA_PREFIX="@GEANT4_INSTALL@"
+        export CONDA_DEFAULT_ENV="${CONDA_DEFAULT_ENV:-hibeam_env}"
+        export PATH="${CONDA_PREFIX}/bin:${PATH}"
+        for f in "${CONDA_PREFIX}"/etc/conda/activate.d/*.sh; do
+            [ -f "${f}" ] && source "${f}"
+        done
+    elif [ -f "@GEANT4_INSTALL@/bin/geant4.sh" ]; then
+        # shellcheck disable=SC1091
+        source "@GEANT4_INSTALL@/bin/geant4.sh"
+    fi
+fi
+
+if [ -n "@NNBAR_WRAPPER_LIBRARY_PATH@" ]; then
+    if [ -n "${@NNBAR_LIBRARY_PATH_VAR@:-}" ]; then
+        export @NNBAR_LIBRARY_PATH_VAR@="@NNBAR_WRAPPER_LIBRARY_PATH@:${@NNBAR_LIBRARY_PATH_VAR@}"
+    else
+        export @NNBAR_LIBRARY_PATH_VAR@="@NNBAR_WRAPPER_LIBRARY_PATH@"
+    fi
+fi
+
+exec "${SCRIPT_DIR}/nnbar-detector-simulation.bin" "$@"

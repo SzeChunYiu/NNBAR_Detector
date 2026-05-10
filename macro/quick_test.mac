@@ -1,0 +1,5 @@
+# Quick test macro - minimal events, no visualization
+/run/verbose 1
+/event/verbose 0
+/tracking/verbose 0
+/run/beamOn 10

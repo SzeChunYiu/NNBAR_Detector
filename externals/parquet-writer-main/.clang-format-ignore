@@ -1,7 +1,0 @@
-./exts/*
-./cmake/*
-./build/*
-./bash/*
-
-./src/cpp/nlohmann/*
-./src/cpp/spdlog/*
