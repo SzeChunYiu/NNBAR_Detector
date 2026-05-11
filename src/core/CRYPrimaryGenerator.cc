@@ -108,7 +108,9 @@ void CRYPrimaryGenerator::UpdateCRYSetup() {
     const bool wantProton = (fParticleType == "proton");
 
     std::ostringstream config;
-    config << "date 1-1-2024 latitude 55.71 altitude 0 subboxLength 2400 "
+    // CRY v1.7 uses meters for the subbox length and returned particle
+    // positions.  The thesis cosmic event plane is 24 m x 24 m at z=+5 m.
+    config << "date 1-1-2024 latitude 55.71 altitude 0 subboxLength 24 "
            << "returnMuons " << (wantMuon ? 1 : 0) << ' '
            << "returnGammas " << (wantGamma ? 1 : 0) << ' '
            << "returnElectrons " << (wantElectron ? 1 : 0) << ' '
@@ -202,8 +204,8 @@ void CRYPrimaryGenerator::GenerateCRYPrimaries(G4Event* anEvent) {
     if (fEmax > fEmin) {
         ke = (fEmin + G4UniformRand() * (fEmax - fEmin)) * CLHEP::GeV;
     }
-    const G4double x = selected->x() * CLHEP::cm;
-    const G4double y = selected->y() * CLHEP::cm;
+    const G4double x = selected->x() * CLHEP::m;
+    const G4double y = selected->y() * CLHEP::m;
     const G4double z = 500.0 * CLHEP::cm;
     const G4double t = selected->t() * CLHEP::s;
     G4ThreeVector dir(selected->u(), selected->v(), selected->w());

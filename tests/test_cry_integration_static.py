@@ -42,7 +42,15 @@ def test_cry_primary_generator_files_implement_thesis_parameters() -> None:
     assert "date 1-1-2024" in source
     assert "latitude 55.71" in source
     assert "altitude 0" in source
-    assert "subboxLength 2400" in source
+    # CRY v1.7 reports particle positions in meters, so the 24 m x 24 m
+    # thesis plane must be configured as a 24 m CRY subbox and converted to
+    # Geant4 length units with CLHEP::m.  Treating CRY's coordinates as cm
+    # shrinks the generated plane by a factor of 100 in the Parquet output.
+    assert re.search(r"subboxLength\s+24(?!\d)", source)
+    assert "selected->x() * CLHEP::m" in source
+    assert "selected->y() * CLHEP::m" in source
+    assert "selected->x() * CLHEP::cm" not in source
+    assert "selected->y() * CLHEP::cm" not in source
     assert "500.0 * CLHEP::cm" in source
     assert "G4UniformRand() * (fEmax - fEmin)" in source
     assert "N_ij[6][5]" in source
